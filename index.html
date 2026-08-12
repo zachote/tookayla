@@ -23,25 +23,35 @@
         --accent: #6a5ff0;
     }
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
         font-family: -apple-system, Segoe UI, Arial, sans-serif;
         background-color: var(--bg);
         color: var(--text);
         margin: 0;
-        padding: 24px;
+        overflow: hidden;
     }
-    .wrap { max-width: 1180px; margin: 0 auto; }
-    h1 { text-align: center; margin-bottom: 4px; font-size: 24px; }
-    .subtitle { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+    h1 { text-align: center; margin: 0 0 4px; font-size: 22px; }
+    .subtitle { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 20px; }
 
-    .layout {
-        display: grid;
-        grid-template-columns: minmax(320px, 440px) 1fr;
-        gap: 20px;
-        align-items: start;
+    .col-console {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 50vw;
+        height: 100vh;
+        padding: 20px;
     }
-    .col-console { position: sticky; top: 24px; }
-    .col-controls { display: flex; flex-direction: column; gap: 16px; }
+    .col-controls {
+        position: fixed;
+        top: 0;
+        left: 50vw;
+        width: 50vw;
+        height: 100vh;
+        overflow-y: auto;
+        padding: 20px 24px;
+    }
+    .col-controls-inner { display: flex; flex-direction: column; gap: 16px; }
 
     .panel {
         background: var(--panel-bg);
@@ -103,14 +113,14 @@
     button:disabled { opacity: 0.35; cursor: not-allowed; }
     button.secondary { background-color: #48485a; }
     button.running { background-color: var(--btn-stop-bg); }
+    button.paused { background-color: #a8781e; }
 
     .console-panel {
         background: var(--console-bg);
         color: var(--console-text);
         border-radius: 14px;
         padding: 14px 16px;
-        height: calc(100vh - 140px);
-        min-height: 360px;
+        height: 100%;
         overflow-y: auto;
         font-family: "SF Mono", Consolas, Menlo, monospace;
         font-size: 12.5px;
@@ -150,29 +160,16 @@
     .search-item a:hover { text-decoration: underline; }
     .search-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
     .hint-text { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
-
-    @media (max-width: 900px) {
-        .layout { grid-template-columns: 1fr; }
-        .col-console { position: static; }
-        .console-panel { height: 360px; }
-    }
-    @media (max-width: 600px) {
-        .controls-row { flex-direction: column; align-items: stretch; }
-        input[type="number"] { width: 100%; }
-    }
 </style>
 </head>
 <body>
-<div class="wrap">
-    <h1>Toolost Release Scanner</h1>
-    <div class="subtitle">Skanowanie wydań release-preview po ID</div>
+    <div class="col-console">
+        <div class="console-panel" id="console"></div>
+    </div>
 
-    <div class="layout">
-        <div class="col-console">
-            <div class="console-panel" id="console"></div>
-        </div>
+    <div class="col-controls">
 
-        <div class="col-controls">
+        <div class="col-controls-inner">
             <div class="panel">
                 <div class="status-grid">
                     <div class="status-item">
@@ -219,6 +216,7 @@
                 </div>
                 <div class="controls-row">
                     <button id="gapFillBtn">⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)</button>
+                    <button id="pauseBtn" disabled>⏸ Pauza</button>
                 </div>
                 <div class="hint-text">Startuje od podanego ID i idzie w dół. Pomija (bez fetchowania) ID, które już masz zapisane — sprawdza tylko to, czego jeszcze nie ma. Dzięki temu wypełnia luki w już zeskanowanym zakresie, a po przejściu przez niego leci dalej w nieznane ID bez zatrzymywania się, dokładnie jak zwykłe „w dół”.</div>
             </div>
