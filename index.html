@@ -66,15 +66,16 @@
         margin-right: 4px;
     }
 
-    input[type="number"] {
+    input[type="number"], input[type="text"] {
         padding: 9px 10px;
         font-size: 14px;
         border-radius: 6px;
         border: 1px solid var(--border);
         background: #fff;
         color: var(--text);
-        width: 160px;
     }
+    input[type="number"] { width: 160px; }
+    input[type="text"] { flex: 1; min-width: 200px; }
 
     button {
         padding: 10px 16px;
@@ -116,6 +117,27 @@
         margin-top: 10px;
     }
 
+    .search-results { margin-top: 10px; max-height: 320px; overflow-y: auto; }
+    .search-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 14px 0; }
+    .search-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        margin-bottom: 6px;
+    }
+    .search-item:hover { background: #fafaff; }
+    .search-item-main { min-width: 0; }
+    .search-item-title { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .search-item-artist { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .search-item a { font-size: 12px; color: #2f6fed; text-decoration: none; white-space: nowrap; flex-shrink: 0; }
+    .search-item a:hover { text-decoration: underline; }
+    .search-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
+    .hint-text { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
+
     @media (max-width: 600px) {
         .controls-row { flex-direction: column; align-items: stretch; }
         input[type="number"] { width: 100%; }
@@ -142,6 +164,10 @@
                 <div class="value" id="statPending">0</div>
             </div>
             <div class="status-item">
+                <div class="label">Prędkość</div>
+                <div class="value" id="statSpeed">–</div>
+            </div>
+            <div class="status-item">
                 <div class="label">Ostatni upload</div>
                 <div class="value" id="statUpload">–</div>
             </div>
@@ -162,6 +188,15 @@
             <button id="exportBtn" class="secondary">💾 Eksportuj JSON (kopia zapasowa)</button>
         </div>
         <div class="save-status" id="saveStatus"></div>
+        <div class="hint-text">Skanowanie „w górę”/„w dół” nie kończy się przy pierwszej dłuższej serii brakujących ID (to może być zwykła przerwa w numeracji) — kontynuuje aż do ID docelowego, ręcznego zatrzymania albo bardzo długiej serii braków (bezpiecznik).</div>
+    </div>
+
+    <div class="panel">
+        <div class="controls-row">
+            <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
+            <input type="text" id="searchInput" placeholder="tytuł, artysta lub nazwa utworu...">
+        </div>
+        <div id="searchResults" class="search-results"></div>
     </div>
 
     <div class="console-panel" id="console"></div>
@@ -172,12 +207,13 @@
     // ID Twojego Gista — samo ID jest bezpieczne w kodzie klienta (pozwala tylko na odczyt).
     const GIST_ID = '2f3945ff4ab15e56a30cb733f6549d34';
 
-    const CONCURRENCY = 8;          // ile żądań równolegle w jednej paczce
-    const BATCH_DELAY_MS = 150;     // odstęp między paczkami
-    const REQUEST_TIMEOUT_MS = 15000;
-    const MISS_STREAK_LIMIT = 30;   // tyle kolejnych 404 = koniec wydań w tym kierunku
+    const CONCURRENCY = 16;         // ile żądań w locie jednocześnie (pula workerów, nie paczki z przerwą)
+    const REQUEST_TIMEOUT_MS = 12000;
+    const MISS_MILESTONE = 30;      // co tyle kolejnych 404 z rzędu wypisujemy przypomnienie (NIE zatrzymuje skanowania)
+    const MISS_SAFETY_LIMIT = 3000; // bezpiecznik: tyle kolejnych 404 = przerwij, żeby nie skanować bez końca w razie awarii (to NIE oznacza pewnego końca zakresu)
     const ERROR_STREAK_LIMIT = 50;  // tyle kolejnych błędów sieci = przerwij (coś nie działa)
     const MAX_LOG_LINES = 500;      // ile linii trzymamy w konsoli (starsze są usuwane)
+    const SPEED_UPDATE_MS = 1000;   // jak często odświeżamy licznik ID/s
 
     // ============ STAN ============
     let itemsMap = new Map();   // currentId -> item
@@ -189,6 +225,7 @@
     let isRunning = false;
     let runningDirection = null; // 'up' | 'down' | null
     let isUploading = false;
+    let speedIntervalHandle = null;
 
     // ============ POMOCNICZE ============
     function toBase64(str) {
@@ -233,13 +270,62 @@
         document.getElementById('saveStatus').textContent = text;
     }
 
+    // ============ PRZEGLĄDARKA ZAPISANYCH WYDAŃ ============
+    function normalizeSearch(s) {
+        return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    const searchInput = document.getElementById('searchInput');
+    const searchResultsEl = document.getElementById('searchResults');
+    let searchDebounceHandle = null;
+
+    function renderSearchResults() {
+        const raw = searchInput.value.trim();
+        if (raw === '') {
+            searchResultsEl.innerHTML = '';
+            return;
+        }
+        const terms = normalizeSearch(raw).split(/\s+/).filter(Boolean);
+        const matches = [];
+        for (const item of itemsMap.values()) {
+            const hay = normalizeSearch(
+                `${item.title} ${item.artist} ${(item.tracks || []).map(t => `${t.name} ${t.artist}`).join(' ')}`
+            );
+            if (terms.every(t => hay.includes(t))) matches.push(item);
+        }
+        matches.sort((a, b) => b.currentId - a.currentId);
+        const shown = matches.slice(0, 100);
+
+        if (matches.length === 0) {
+            searchResultsEl.innerHTML = '<div class="search-empty">Brak wyników.</div>';
+            return;
+        }
+
+        searchResultsEl.innerHTML = shown.map(item => `
+            <div class="search-item">
+                <div class="search-item-main">
+                    <div class="search-item-title">${escapeHtml(item.title)}</div>
+                    <div class="search-item-artist">${escapeHtml(item.artist)} · ID ${item.currentId}</div>
+                </div>
+                <a href="${escapeHtml(item.targetUrl)}" target="_blank" rel="noopener">Otwórz ↗</a>
+            </div>
+        `).join('') + (matches.length > shown.length
+            ? `<div class="search-count">Pokazano ${shown.length} z ${matches.length} wyników.</div>`
+            : `<div class="search-count">${matches.length} wynik(ów).</div>`);
+    }
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounceHandle);
+        searchDebounceHandle = setTimeout(renderSearchResults, 150);
+    });
+
     function setButtonsForRunningState() {
         const upBtn = document.getElementById('upBtn');
         const downBtn = document.getElementById('downBtn');
         upBtn.classList.toggle('running', runningDirection === 'up');
         downBtn.classList.toggle('running', runningDirection === 'down');
-        upBtn.textContent = runningDirection === 'up' ? '⏹ Zatrzymaj (w górę)' : '▲ Idź w górę';
-        downBtn.textContent = runningDirection === 'down' ? '⏹ Zatrzymaj (w dół)' : '▼ Idź w dół';
+        upBtn.textContent = runningDirection === 'up' ? '⏹ Zatrzymaj (w górę)' : '▲ Idź w górę (nowsze)';
+        downBtn.textContent = runningDirection === 'down' ? '⏹ Zatrzymaj (w dół)' : '▼ Idź w dół (starsze)';
         upBtn.disabled = runningDirection === 'down';
         downBtn.disabled = runningDirection === 'up';
     }
@@ -269,6 +355,7 @@
             }
             lastChunkName = chunkNames.length ? chunkNames[chunkNames.length - 1] : null;
             updateStatusBar();
+            renderSearchResults();
             log(`Wczytano ${itemsMap.size.toLocaleString('pl-PL')} wydań z Gist (zakres ID ${minId}–${maxId}).`, 'info');
     }
 
@@ -372,89 +459,105 @@
         }
     }
 
-    // ============ PĘTLA SKANOWANIA ============
+    // ============ PĘTLA SKANOWANIA (pula workerów — bez czekania na całą paczkę) ============
+    // Każdy z CONCURRENCY workerów bierze kolejne ID i od razu leci po następne, gdy skończy —
+    // zamiast czekać na najwolniejszą odpowiedź w paczce. To jest główne przyspieszenie.
+    //
+    // Długa seria 404 z rzędu NIE oznacza automatycznie końca zakresu (numeracja może mieć
+    // zwykłe przerwy), więc skanowanie się nie zatrzymuje samo z siebie — tylko informuje.
+    // Prawdziwe zatrzymanie: ID docelowe / ręczny Stop / bardzo długa seria 404 (bezpiecznik)
+    // / seria błędów sieci.
     async function scanLoop(direction, targetId) {
-        let cursor = direction === 'up' ? maxId + 1 : minId - 1;
+        let nextIdToAssign = direction === 'up' ? maxId + 1 : minId - 1;
         let missStreak = 0;
+        let lastMilestoneAt = 0;
         let errorStreak = 0;
+        let boundaryLogged = false;
+        let safetyLogged = false;
+        let errorLogged = false;
+        let checkedSinceTick = 0;
 
-        log(`Start skanowania: kierunek ${direction === 'up' ? 'w górę' : 'w dół'}, od ID ${cursor}${targetId !== null ? ` do ${targetId}` : ''}.`, 'info');
+        log(`Start skanowania: kierunek ${direction === 'up' ? 'w górę' : 'w dół'}, od ID ${nextIdToAssign}${targetId !== null ? ` do ${targetId}` : ''}, ${CONCURRENCY} żądań jednocześnie.`, 'info');
 
-        while (isRunning) {
-            const batchIds = [];
-            for (let i = 0; i < CONCURRENCY; i++) {
-                const id = direction === 'up' ? cursor + i : cursor - i;
-                if (id < 1) break;
-                if (targetId !== null) {
-                    if (direction === 'up' && id > targetId) break;
-                    if (direction === 'down' && id < targetId) break;
+        const speedEl = document.getElementById('statSpeed');
+        speedIntervalHandle = setInterval(() => {
+            speedEl.textContent = `${checkedSinceTick} ID/s`;
+            checkedSinceTick = 0;
+        }, SPEED_UPDATE_MS);
+
+        function claimNextId() {
+            if (targetId !== null) {
+                if (direction === 'up' && nextIdToAssign > targetId) return null;
+                if (direction === 'down' && nextIdToAssign < targetId) return null;
+            }
+            if (nextIdToAssign < 1) return null;
+            const id = nextIdToAssign;
+            nextIdToAssign = direction === 'up' ? nextIdToAssign + 1 : nextIdToAssign - 1;
+            return id;
+        }
+
+        async function worker() {
+            while (isRunning) {
+                const id = claimNextId();
+                if (id === null) {
+                    if (!boundaryLogged) {
+                        boundaryLogged = true;
+                        log(targetId !== null
+                            ? `Zakończono: osiągnięto ID docelowe ${targetId}.`
+                            : 'Zakończono: osiągnięto dolną granicę zakresu ID (1).', 'info');
+                    }
+                    isRunning = false;
+                    break;
                 }
-                batchIds.push(id);
-            }
 
-            if (batchIds.length === 0) {
-                log('Osiągnięto ID docelowe lub granicę zakresu.', 'info');
-                break;
-            }
+                const res = await fetchOne(id);
+                checkedSinceTick++;
 
-            cursor = direction === 'up'
-                ? batchIds[batchIds.length - 1] + 1
-                : batchIds[batchIds.length - 1] - 1;
-
-            let results;
-            try {
-                results = await Promise.all(batchIds.map(id => fetchOne(id)));
-            } catch (err) {
-                log(`Nieoczekiwany błąd paczki: ${err.message}`, 'error');
-                results = batchIds.map(id => ({ id, status: 'error', message: err.message }));
-            }
-
-            results.sort((a, b) => direction === 'up' ? a.id - b.id : b.id - a.id);
-
-            for (const res of results) {
                 if (res.status === 'found') {
                     const item = { currentId: res.id, title: res.title, artist: res.artist, tracks: res.tracks, targetUrl: res.targetUrl };
                     const isNew = addItemToMemory(item);
                     if (isNew) pendingNewItems.push(item);
                     missStreak = 0;
+                    lastMilestoneAt = 0;
                     errorStreak = 0;
                     const trackInfo = res.tracks.length ? ` (${res.tracks.length} utw.)` : '';
                     log(`✔ ID ${res.id} — "${res.title}" — ${res.artist}${trackInfo}`, 'found');
+                    updateStatusBar();
                 } else if (res.status === 'notfound') {
                     missStreak++;
                     errorStreak = 0;
                     log(`— ID ${res.id}: brak wydania (404)`, 'miss');
+                    if (missStreak - lastMilestoneAt >= MISS_MILESTONE) {
+                        lastMilestoneAt = missStreak;
+                        log(`Uwaga: ${missStreak} kolejnych ID bez wydania z rzędu — może to być zwykła przerwa w numeracji, skanowanie kontynuowane.`, 'info');
+                    }
+                    if (missStreak >= MISS_SAFETY_LIMIT) {
+                        if (!safetyLogged) {
+                            safetyLogged = true;
+                            log(`Przerwano (bezpiecznik): ${MISS_SAFETY_LIMIT} kolejnych ID bez wydania. To NIE musi oznaczać końca zakresu — dalej mogą być kolejne wydania. Wznów ręcznie, jeśli chcesz kontynuować dalej w tym kierunku.`, 'error');
+                        }
+                        isRunning = false;
+                    }
                 } else if (res.status === 'error') {
                     errorStreak++;
                     log(`✖ ID ${res.id}: błąd — ${res.message}`, 'error');
+                    if (errorStreak >= ERROR_STREAK_LIMIT) {
+                        if (!errorLogged) {
+                            errorLogged = true;
+                            log(`Przerwano: ${ERROR_STREAK_LIMIT} kolejnych błędów sieci — sprawdź połączenie lub czy strona nie blokuje zapytań.`, 'error');
+                        }
+                        isRunning = false;
+                    }
                 }
             }
-
-            updateStatusBar();
-
-            if (missStreak >= MISS_STREAK_LIMIT) {
-                log(`Zatrzymano: ${MISS_STREAK_LIMIT} kolejnych ID bez wydania — to prawdopodobnie koniec dostępnych ID w tym kierunku.`, 'info');
-                break;
-            }
-            if (errorStreak >= ERROR_STREAK_LIMIT) {
-                log(`Przerwano: ${ERROR_STREAK_LIMIT} kolejnych błędów sieci — sprawdź połączenie lub czy strona nie blokuje zapytań.`, 'error');
-                break;
-            }
-            if (targetId !== null) {
-                if ((direction === 'up' && cursor > targetId) || (direction === 'down' && cursor < targetId)) {
-                    log(`Zakończono: osiągnięto ID docelowe ${targetId}.`, 'info');
-                    break;
-                }
-            }
-            if (cursor < 1) {
-                log('Zakończono: osiągnięto dolną granicę zakresu ID (1).', 'info');
-                break;
-            }
-
-            await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
         }
 
-        isRunning = false;
+        const workers = [];
+        for (let i = 0; i < CONCURRENCY; i++) workers.push(worker());
+        await Promise.all(workers);
+
+        clearInterval(speedIntervalHandle);
+        speedEl.textContent = '–';
         runningDirection = null;
         setButtonsForRunningState();
         log('Skanowanie zatrzymane.', 'info');
