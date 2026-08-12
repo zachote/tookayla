@@ -6,12 +6,12 @@
 <title>Toolost Release Scanner</title>
 <style>
     :root {
-        --bg: #f7f7ff;
-        --text: #000000;
-        --muted: #666666;
-        --panel-bg: #ffffff;
-        --border: #dcdce8;
-        --btn-bg: #000000;
+        --bg: #f2f1f8;
+        --text: #16161a;
+        --muted: #77778a;
+        --panel-bg: #fbfbfe;
+        --panel-bg-alt: #eeedf6;
+        --btn-bg: #16161a;
         --btn-text: #ffffff;
         --btn-stop-bg: #b3261e;
         --console-bg: #111114;
@@ -20,6 +20,7 @@
         --miss: #888888;
         --err: #ff6b6b;
         --info: #6cb6ff;
+        --accent: #6a5ff0;
     }
     * { box-sizing: border-box; }
     body {
@@ -29,27 +30,34 @@
         margin: 0;
         padding: 24px;
     }
-    .wrap { max-width: 900px; margin: 0 auto; }
+    .wrap { max-width: 1180px; margin: 0 auto; }
     h1 { text-align: center; margin-bottom: 4px; font-size: 24px; }
     .subtitle { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
 
+    .layout {
+        display: grid;
+        grid-template-columns: minmax(320px, 440px) 1fr;
+        gap: 20px;
+        align-items: start;
+    }
+    .col-console { position: sticky; top: 24px; }
+    .col-controls { display: flex; flex-direction: column; gap: 16px; }
+
     .panel {
         background: var(--panel-bg);
-        border: 1px solid var(--border);
-        border-radius: 12px;
+        border-radius: 14px;
         padding: 18px 20px;
-        margin-bottom: 16px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     }
+    .panel.alt { background: var(--panel-bg-alt); }
 
     .status-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 14px;
     }
     .status-item { text-align: center; }
     .status-item .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .status-item .value { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .status-item .value { font-size: 17px; font-weight: 700; margin-top: 2px; }
 
     .controls-row {
         display: flex;
@@ -67,12 +75,16 @@
     }
 
     input[type="number"], input[type="text"] {
-        padding: 9px 10px;
+        padding: 10px 12px;
         font-size: 14px;
-        border-radius: 6px;
-        border: 1px solid var(--border);
-        background: #fff;
+        border-radius: 8px;
+        border: none;
+        background: var(--panel-bg-alt);
         color: var(--text);
+    }
+    input[type="number"]:focus, input[type="text"]:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 0;
     }
     input[type="number"] { width: 160px; }
     input[type="text"] { flex: 1; min-width: 200px; }
@@ -84,20 +96,21 @@
         background-color: var(--btn-bg);
         color: var(--btn-text);
         border: none;
-        border-radius: 6px;
+        border-radius: 8px;
         cursor: pointer;
     }
     button:hover { opacity: 0.85; }
     button:disabled { opacity: 0.35; cursor: not-allowed; }
-    button.secondary { background-color: #333; }
+    button.secondary { background-color: #48485a; }
     button.running { background-color: var(--btn-stop-bg); }
 
     .console-panel {
         background: var(--console-bg);
         color: var(--console-text);
-        border-radius: 12px;
+        border-radius: 14px;
         padding: 14px 16px;
-        height: 440px;
+        height: calc(100vh - 140px);
+        min-height: 360px;
         overflow-y: auto;
         font-family: "SF Mono", Consolas, Menlo, monospace;
         font-size: 12.5px;
@@ -124,20 +137,25 @@
         justify-content: space-between;
         align-items: center;
         gap: 10px;
-        padding: 8px 10px;
+        padding: 10px 12px;
         border-radius: 8px;
-        border: 1px solid var(--border);
+        background: var(--panel-bg-alt);
         margin-bottom: 6px;
     }
-    .search-item:hover { background: #fafaff; }
+    .search-item:hover { background: #e4e2f4; }
     .search-item-main { min-width: 0; }
     .search-item-title { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .search-item-artist { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .search-item a { font-size: 12px; color: #2f6fed; text-decoration: none; white-space: nowrap; flex-shrink: 0; }
+    .search-item a { font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; flex-shrink: 0; }
     .search-item a:hover { text-decoration: underline; }
     .search-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
     .hint-text { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
 
+    @media (max-width: 900px) {
+        .layout { grid-template-columns: 1fr; }
+        .col-console { position: static; }
+        .console-panel { height: 360px; }
+    }
     @media (max-width: 600px) {
         .controls-row { flex-direction: column; align-items: stretch; }
         input[type="number"] { width: 100%; }
@@ -149,61 +167,71 @@
     <h1>Toolost Release Scanner</h1>
     <div class="subtitle">Skanowanie wydań release-preview po ID</div>
 
-    <div class="panel">
-        <div class="status-grid">
-            <div class="status-item">
-                <div class="label">Zapisanych wydań</div>
-                <div class="value" id="statTotal">–</div>
+    <div class="layout">
+        <div class="col-console">
+            <div class="console-panel" id="console"></div>
+        </div>
+
+        <div class="col-controls">
+            <div class="panel">
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="label">Zapisanych wydań</div>
+                        <div class="value" id="statTotal">–</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">Zakres ID</div>
+                        <div class="value" id="statRange">–</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">Do wysłania</div>
+                        <div class="value" id="statPending">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">Prędkość</div>
+                        <div class="value" id="statSpeed">–</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">Ostatni upload</div>
+                        <div class="value" id="statUpload">–</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">Limit GitHub API</div>
+                        <div class="value" id="statRateLimit">–</div>
+                    </div>
+                </div>
             </div>
-            <div class="status-item">
-                <div class="label">Zakres ID</div>
-                <div class="value" id="statRange">–</div>
+
+            <div class="panel alt">
+                <div class="controls-row">
+                    <button id="uploadBtn" class="secondary">⬆️ Wyślij nowe dane na hosting</button>
+                    <button id="exportBtn" class="secondary">💾 Eksportuj JSON (kopia zapasowa)</button>
+                    <button id="importBtn" class="secondary">📥 Importuj JSON</button>
+                    <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
+                </div>
+                <div class="save-status" id="saveStatus"></div>
             </div>
-            <div class="status-item">
-                <div class="label">Do wysłania</div>
-                <div class="value" id="statPending">0</div>
+
+            <div class="panel">
+                <div class="controls-row">
+                    <label class="field-label" for="startIdInput">ID startowe:</label>
+                    <input type="number" id="startIdInput" placeholder="np. 1350000">
+                </div>
+                <div class="controls-row">
+                    <button id="gapFillBtn">⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)</button>
+                </div>
+                <div class="hint-text">Startuje od podanego ID i idzie w dół. Pomija (bez fetchowania) ID, które już masz zapisane — sprawdza tylko to, czego jeszcze nie ma. Dzięki temu wypełnia luki w już zeskanowanym zakresie, a po przejściu przez niego leci dalej w nieznane ID bez zatrzymywania się, dokładnie jak zwykłe „w dół”.</div>
             </div>
-            <div class="status-item">
-                <div class="label">Prędkość</div>
-                <div class="value" id="statSpeed">–</div>
-            </div>
-            <div class="status-item">
-                <div class="label">Ostatni upload</div>
-                <div class="value" id="statUpload">–</div>
+
+            <div class="panel alt">
+                <div class="controls-row">
+                    <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
+                    <input type="text" id="searchInput" placeholder="tytuł lub artysta...">
+                </div>
+                <div id="searchResults" class="search-results"></div>
             </div>
         </div>
     </div>
-
-    <div class="panel">
-        <div class="controls-row">
-            <button id="uploadBtn" class="secondary">⬆️ Wyślij nowe dane na hosting</button>
-            <button id="exportBtn" class="secondary">💾 Eksportuj JSON (kopia zapasowa)</button>
-            <button id="importBtn" class="secondary">📥 Importuj JSON</button>
-            <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
-        </div>
-        <div class="save-status" id="saveStatus"></div>
-    </div>
-
-    <div class="panel">
-        <div class="controls-row">
-            <label class="field-label" for="startIdInput">ID startowe:</label>
-            <input type="number" id="startIdInput" placeholder="np. 1350000">
-        </div>
-        <div class="controls-row">
-            <button id="gapFillBtn">⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)</button>
-        </div>
-        <div class="hint-text">Startuje od podanego ID i idzie w dół. Pomija (bez fetchowania) ID, które już masz zapisane — sprawdza tylko to, czego jeszcze nie ma. Dzięki temu wypełnia luki w już zeskanowanym zakresie, a po przejściu przez niego leci dalej w nieznane ID bez zatrzymywania się, dokładnie jak zwykłe „w dół”.</div>
-    </div>
-
-    <div class="panel">
-        <div class="controls-row">
-            <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
-            <input type="text" id="searchInput" placeholder="tytuł lub artysta...">
-        </div>
-        <div id="searchResults" class="search-results"></div>
-    </div>
-
-    <div class="console-panel" id="console"></div>
 </div>
 
 <script>
@@ -273,6 +301,18 @@
 
     function setSaveStatus(text) {
         document.getElementById('saveStatus').textContent = text;
+    }
+
+    function updateRateLimit(rateLimit) {
+        if (!rateLimit || typeof rateLimit.remaining !== 'number') return;
+        const el = document.getElementById('statRateLimit');
+        let text = `${rateLimit.remaining.toLocaleString('pl-PL')} / ${rateLimit.limit.toLocaleString('pl-PL')}`;
+        if (rateLimit.resetAt) {
+            const resetTime = new Date(rateLimit.resetAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+            text += ` (reset ${resetTime})`;
+        }
+        el.textContent = text;
+        el.style.color = rateLimit.remaining <= 50 ? 'var(--err)' : rateLimit.remaining <= 500 ? '#c98a1d' : '';
     }
 
     // ============ PRZEGLĄDARKA ZAPISANYCH WYDAŃ ============
@@ -405,6 +445,7 @@
                     body: JSON.stringify({ items: batch, lastChunkName })
                 });
                 const result = await resp.json();
+                updateRateLimit(result.rateLimit);
                 if (!resp.ok || !result.ok) {
                     const remaining = batch.concat(...batches.slice(i + 1));
                     pendingNewItems = remaining.concat(pendingNewItems);

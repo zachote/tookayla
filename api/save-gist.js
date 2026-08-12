@@ -11,6 +11,18 @@
 
 const CHUNK_LIMIT = 900 * 1024; // bezpieczny margines poniżej limitu ~1MB/plik w Gist API
 
+function readRateLimit(resp) {
+    const limit = resp.headers.get('x-ratelimit-limit');
+    const remaining = resp.headers.get('x-ratelimit-remaining');
+    const reset = resp.headers.get('x-ratelimit-reset');
+    if (limit === null || remaining === null) return null;
+    return {
+        limit: Number(limit),
+        remaining: Number(remaining),
+        resetAt: reset ? Number(reset) * 1000 : null // ms epoch
+    };
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
@@ -56,8 +68,9 @@ module.exports = async (req, res) => {
     //    nieaktualnej zawartości i nadpisania (utraty) danych z poprzedniej paczki.
     //    api.github.com zwraca zawsze aktualny stan, więc jest tu bezpieczne.
     const gistResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: apiHeaders });
+    const rateLimitAfterGet = readRateLimit(gistResp);
     if (!gistResp.ok) {
-        res.status(502).json({ error: 'Nie udało się pobrać gista.', status: gistResp.status });
+        res.status(502).json({ error: 'Nie udało się pobrać gista.', status: gistResp.status, rateLimit: rateLimitAfterGet });
         return;
     }
     const gist = await gistResp.json();
@@ -104,7 +117,7 @@ module.exports = async (req, res) => {
     }
 
     if (toAdd.length === 0) {
-        res.status(200).json({ ok: true, message: 'Wszystkie pozycje już zapisane.', lastChunkName });
+        res.status(200).json({ ok: true, message: 'Wszystkie pozycje już zapisane.', lastChunkName, rateLimit: rateLimitAfterGet });
         return;
     }
 
@@ -134,9 +147,9 @@ module.exports = async (req, res) => {
 
     if (!patchResp.ok) {
         const errText = await patchResp.text();
-        res.status(502).json({ error: 'Zapis do gista nie powiódł się.', details: errText });
+        res.status(502).json({ error: 'Zapis do gista nie powiódł się.', details: errText, rateLimit: readRateLimit(patchResp) });
         return;
     }
 
-    res.status(200).json({ ok: true, added: toAdd.length, lastChunkName: currentName });
+    res.status(200).json({ ok: true, added: toAdd.length, lastChunkName: currentName, rateLimit: readRateLimit(patchResp) });
 };
