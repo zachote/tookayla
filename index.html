@@ -170,7 +170,7 @@
 <script>
     // ============ KONFIGURACJA ============
     // ID Twojego Gista — samo ID jest bezpieczne w kodzie klienta (pozwala tylko na odczyt).
-    const GIST_ID = 'WKLEJ_TU_ID_SWOJEGO_GISTA';
+    const GIST_ID = '2f3945ff4ab15e56a30cb733f6549d34';
 
     const CONCURRENCY = 8;          // ile żądań równolegle w jednej paczce
     const BATCH_DELAY_MS = 150;     // odstęp między paczkami
@@ -246,7 +246,7 @@
 
     // ============ WCZYTYWANIE Z GIST ============
     async function loadFromGist() {
-        if (GIST_ID === 'WKLEJ_TU_ID_SWOJEGO_GISTA') {
+        if (GIST_ID === '2f3945ff4ab15e56a30cb733f6549d34') {
             log('Nie ustawiono GIST_ID w kodzie strony (patrz komentarz na górze skryptu).', 'error');
             return;
         }
