@@ -66,15 +66,16 @@
         margin-right: 4px;
     }
 
-    input[type="number"] {
+    input[type="number"], input[type="text"] {
         padding: 9px 10px;
         font-size: 14px;
         border-radius: 6px;
         border: 1px solid var(--border);
         background: #fff;
         color: var(--text);
-        width: 160px;
     }
+    input[type="number"] { width: 160px; }
+    input[type="text"] { flex: 1; min-width: 200px; }
 
     button {
         padding: 10px 16px;
@@ -116,6 +117,27 @@
         margin-top: 10px;
     }
 
+    .search-results { margin-top: 10px; max-height: 320px; overflow-y: auto; }
+    .search-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 14px 0; }
+    .search-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        margin-bottom: 6px;
+    }
+    .search-item:hover { background: #fafaff; }
+    .search-item-main { min-width: 0; }
+    .search-item-title { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .search-item-artist { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .search-item a { font-size: 12px; color: #2f6fed; text-decoration: none; white-space: nowrap; flex-shrink: 0; }
+    .search-item a:hover { text-decoration: underline; }
+    .search-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
+    .hint-text { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
+
     @media (max-width: 600px) {
         .controls-row { flex-direction: column; align-items: stretch; }
         input[type="number"] { width: 100%; }
@@ -125,7 +147,7 @@
 <body>
 <div class="wrap">
     <h1>Toolost Release Scanner</h1>
-    <div class="subtitle">Skanowanie wydań release-preview po ID — w dół, od podanego ID</div>
+    <div class="subtitle">Skanowanie wydań release-preview po ID</div>
 
     <div class="panel">
         <div class="status-grid">
@@ -142,6 +164,10 @@
                 <div class="value" id="statPending">0</div>
             </div>
             <div class="status-item">
+                <div class="label">Prędkość</div>
+                <div class="value" id="statSpeed">–</div>
+            </div>
+            <div class="status-item">
                 <div class="label">Ostatni upload</div>
                 <div class="value" id="statUpload">–</div>
             </div>
@@ -150,17 +176,31 @@
 
     <div class="panel">
         <div class="controls-row">
-            <label class="field-label" for="targetIdInput">ID startowe (opcjonalnie):</label>
-            <input type="number" id="targetIdInput" placeholder="np. 1350000">
-        </div>
-        <div class="controls-row">
-            <button id="downBtn">▼ Idź w dół</button>
-        </div>
-        <div class="controls-row">
             <button id="uploadBtn" class="secondary">⬆️ Wyślij nowe dane na hosting</button>
             <button id="exportBtn" class="secondary">💾 Eksportuj JSON (kopia zapasowa)</button>
+            <button id="importBtn" class="secondary">📥 Importuj JSON</button>
+            <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
         </div>
         <div class="save-status" id="saveStatus"></div>
+    </div>
+
+    <div class="panel">
+        <div class="controls-row">
+            <label class="field-label" for="startIdInput">ID startowe:</label>
+            <input type="number" id="startIdInput" placeholder="np. 1350000">
+        </div>
+        <div class="controls-row">
+            <button id="gapFillBtn">⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)</button>
+        </div>
+        <div class="hint-text">Startuje od podanego ID i idzie w dół. Pomija (bez fetchowania) ID, które już masz zapisane — sprawdza tylko to, czego jeszcze nie ma. Dzięki temu wypełnia luki w już zeskanowanym zakresie, a po przejściu przez niego leci dalej w nieznane ID bez zatrzymywania się, dokładnie jak zwykłe „w dół”.</div>
+    </div>
+
+    <div class="panel">
+        <div class="controls-row">
+            <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
+            <input type="text" id="searchInput" placeholder="tytuł lub artysta...">
+        </div>
+        <div id="searchResults" class="search-results"></div>
     </div>
 
     <div class="console-panel" id="console"></div>
@@ -171,11 +211,14 @@
     // ID Twojego Gista — samo ID jest bezpieczne w kodzie klienta (pozwala tylko na odczyt).
     const GIST_ID = '2f3945ff4ab15e56a30cb733f6549d34';
 
-    const CONCURRENCY = 8;          // ile żądań równolegle w jednej paczce
-    const BATCH_DELAY_MS = 150;     // odstęp między paczkami
-    const REQUEST_TIMEOUT_MS = 15000;
+    const CONCURRENCY = 16;         // ile żądań w locie jednocześnie (pula workerów, nie paczki z przerwą)
+    const REQUEST_TIMEOUT_MS = 12000;
+    const MISS_MILESTONE = 30;      // co tyle kolejnych 404 z rzędu wypisujemy przypomnienie (NIE zatrzymuje skanowania)
+    const MISS_SAFETY_LIMIT = 3000; // bezpiecznik: tyle kolejnych 404 = przerwij, żeby nie skanować bez końca w razie awarii (to NIE oznacza pewnego końca zakresu)
     const ERROR_STREAK_LIMIT = 50;  // tyle kolejnych błędów sieci = przerwij (coś nie działa)
     const MAX_LOG_LINES = 500;      // ile linii trzymamy w konsoli (starsze są usuwane)
+    const SPEED_UPDATE_MS = 1000;   // jak często odświeżamy licznik ID/s
+    const UPLOAD_BATCH_BYTES = 300 * 1024; // maks. rozmiar JSON-a jednej paczki wysyłanej do /api/save-gist (bezpiecznie poniżej limitu payloadu Vercela)
 
     // ============ STAN ============
     let itemsMap = new Map();   // id -> item
@@ -187,6 +230,7 @@
     let isRunning = false;
     let runningDirection = null; // 'up' | 'down' | null
     let isUploading = false;
+    let speedIntervalHandle = null;
 
     // ============ POMOCNICZE ============
     function toBase64(str) {
@@ -231,10 +275,59 @@
         document.getElementById('saveStatus').textContent = text;
     }
 
+    // ============ PRZEGLĄDARKA ZAPISANYCH WYDAŃ ============
+    function normalizeSearch(s) {
+        return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    const searchInput = document.getElementById('searchInput');
+    const searchResultsEl = document.getElementById('searchResults');
+    let searchDebounceHandle = null;
+
+    function renderSearchResults() {
+        const raw = searchInput.value.trim();
+        if (raw === '') {
+            searchResultsEl.innerHTML = '';
+            return;
+        }
+        const terms = normalizeSearch(raw).split(/\s+/).filter(Boolean);
+        const matches = [];
+        for (const item of itemsMap.values()) {
+            const hay = normalizeSearch(`${item.title} ${item.artist}`);
+            if (terms.every(t => hay.includes(t))) matches.push(item);
+        }
+        matches.sort((a, b) => b.id - a.id);
+        const shown = matches.slice(0, 100);
+
+        if (matches.length === 0) {
+            searchResultsEl.innerHTML = '<div class="search-empty">Brak wyników.</div>';
+            return;
+        }
+
+        searchResultsEl.innerHTML = shown.map(item => `
+            <div class="search-item">
+                <div class="search-item-main">
+                    <div class="search-item-title">${escapeHtml(item.title)}</div>
+                    <div class="search-item-artist">${escapeHtml(item.artist)} · ID ${item.id}</div>
+                </div>
+                <a href="${escapeHtml(`https://toolost.com/release-preview/${toBase64(item.id.toString())}`)}" target="_blank" rel="noopener">Otwórz ↗</a>
+            </div>
+        `).join('') + (matches.length > shown.length
+            ? `<div class="search-count">Pokazano ${shown.length} z ${matches.length} wyników.</div>`
+            : `<div class="search-count">${matches.length} wynik(ów).</div>`);
+    }
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounceHandle);
+        searchDebounceHandle = setTimeout(renderSearchResults, 150);
+    });
+
     function setButtonsForRunningState() {
-        const downBtn = document.getElementById('downBtn');
-        downBtn.classList.toggle('running', runningDirection === 'down');
-        downBtn.textContent = runningDirection === 'down' ? '⏹ Zatrzymaj' : '▼ Idź w dół';
+        const gapFillBtn = document.getElementById('gapFillBtn');
+        gapFillBtn.classList.toggle('running', runningDirection === 'gapfill');
+        gapFillBtn.textContent = runningDirection === 'gapfill' ? '⏹ Zatrzymaj (uzupełnianie luk)' : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
+        const otherRunning = isRunning && runningDirection !== null;
+        gapFillBtn.disabled = otherRunning && runningDirection !== 'gapfill';
     }
 
     // ============ WCZYTYWANIE Z GIST ============
@@ -262,10 +355,30 @@
             }
             lastChunkName = chunkNames.length ? chunkNames[chunkNames.length - 1] : null;
             updateStatusBar();
+            renderSearchResults();
             log(`Wczytano ${itemsMap.size.toLocaleString('pl-PL')} wydań z Gist (zakres ID ${minId}–${maxId}).`, 'info');
     }
 
     // ============ UPLOAD DO GIST (ręczny) ============
+    // ============ WYSYŁANIE NA HOSTING (w paczkach — jeden request nie może być za duży) ============
+    function makeUploadBatches(items, maxBytes) {
+        const batches = [];
+        let current = [];
+        let currentSize = 2; // nawiasy tablicy
+        for (const item of items) {
+            const itemSize = JSON.stringify(item).length + 1;
+            if (current.length > 0 && currentSize + itemSize > maxBytes) {
+                batches.push(current);
+                current = [];
+                currentSize = 2;
+            }
+            current.push(item);
+            currentSize += itemSize;
+        }
+        if (current.length > 0) batches.push(current);
+        return batches;
+    }
+
     async function uploadToGist() {
         if (isUploading) return;
         if (pendingNewItems.length === 0) {
@@ -278,32 +391,48 @@
         pendingNewItems = [];
         updateStatusBar();
 
-        setSaveStatus(`Wysyłanie ${toSend.length} pozycji na hosting...`);
-        try {
-            const resp = await fetch('/api/save-gist', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: toSend, lastChunkName })
-            });
-            const result = await resp.json();
-            if (!resp.ok || !result.ok) {
-                pendingNewItems = toSend.concat(pendingNewItems);
-                updateStatusBar();
-                setSaveStatus(`Błąd zapisu: ${result.error || resp.status}`);
-                log(`Nie udało się wysłać danych na hosting: ${result.error || resp.status}`, 'error');
-            } else {
+        const batches = makeUploadBatches(toSend, UPLOAD_BATCH_BYTES);
+        log(`Wysyłanie ${toSend.length} pozycji na hosting w ${batches.length} paczkach (limit ~${Math.round(UPLOAD_BATCH_BYTES / 1024)}KB/paczkę)...`, 'info');
+
+        let totalSent = 0;
+        for (let i = 0; i < batches.length; i++) {
+            const batch = batches[i];
+            setSaveStatus(`Wysyłanie paczki ${i + 1}/${batches.length} (${batch.length} pozycji)...`);
+            try {
+                const resp = await fetch('/api/save-gist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: batch, lastChunkName })
+                });
+                const result = await resp.json();
+                if (!resp.ok || !result.ok) {
+                    const remaining = batch.concat(...batches.slice(i + 1));
+                    pendingNewItems = remaining.concat(pendingNewItems);
+                    updateStatusBar();
+                    setSaveStatus(`Błąd zapisu przy paczce ${i + 1}/${batches.length}: ${result.error || resp.status}. Reszta wróciła do kolejki — spróbuj ponownie.`);
+                    log(`Nie udało się wysłać paczki ${i + 1}/${batches.length}: ${result.error || resp.status}`, 'error');
+                    break;
+                }
                 if (result.lastChunkName) lastChunkName = result.lastChunkName;
-                const now = new Date().toLocaleTimeString('pl-PL');
-                document.getElementById('statUpload').textContent = now;
-                setSaveStatus(`Zapisano ${toSend.length} pozycji na hostingu (${now}).`);
-                log(`Wysłano ${toSend.length} nowych wydań na hosting.`, 'info');
+                totalSent += batch.length;
+                log(`Wysłano paczkę ${i + 1}/${batches.length} (${batch.length} pozycji).`, 'info');
+            } catch (err) {
+                const remaining = batch.concat(...batches.slice(i + 1));
+                pendingNewItems = remaining.concat(pendingNewItems);
+                updateStatusBar();
+                setSaveStatus(`Błąd sieci przy paczce ${i + 1}/${batches.length}: ${err.message}. Reszta wróciła do kolejki — spróbuj ponownie.`);
+                log(`Błąd sieci przy wysyłaniu paczki ${i + 1}/${batches.length}: ${err.message}`, 'error');
+                break;
             }
-        } catch (err) {
-            pendingNewItems = toSend.concat(pendingNewItems);
-            updateStatusBar();
-            setSaveStatus(`Błąd sieci przy wysyłaniu: ${err.message}`);
-            log(`Błąd sieci przy wysyłaniu na hosting: ${err.message}`, 'error');
         }
+
+        if (totalSent === toSend.length) {
+            const now = new Date().toLocaleTimeString('pl-PL');
+            document.getElementById('statUpload').textContent = now;
+            setSaveStatus(`Zapisano ${totalSent} pozycji na hostingu (${now}).`);
+            log(`Wysłano łącznie ${totalSent} nowych wydań na hosting (${batches.length} paczek).`, 'info');
+        }
+
         isUploading = false;
         document.getElementById('uploadBtn').disabled = false;
     }
@@ -322,6 +451,64 @@
         a.remove();
         URL.revokeObjectURL(url);
         log(`Wyeksportowano lokalną kopię zapasową (${allItems.length} pozycji).`, 'info');
+    });
+
+    // ============ IMPORT LOKALNY (z pliku JSON) ============
+    // Akceptuje zarówno plik z eksportu (tablica pozycji), jak i pojedynczy "chunk_*.json" z Gista.
+    // Nowe pozycje trafiają do itemsMap (widoczne od razu w wyszukiwarce) i do pendingNewItems,
+    // żeby dało się je normalnie wysłać przyciskiem "Wyślij nowe dane na hosting".
+    document.getElementById('importBtn').addEventListener('click', () => {
+        document.getElementById('importFileInput').click();
+    });
+
+    document.getElementById('importFileInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        e.target.value = ''; // pozwala wybrać ten sam plik ponownie później
+        if (!file) return;
+
+        let parsed;
+        try {
+            const text = await file.text();
+            parsed = JSON.parse(text);
+        } catch (err) {
+            log(`Nie udało się odczytać pliku "${file.name}": ${err.message}`, 'error');
+            return;
+        }
+
+        const items = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.items) ? parsed.items : null);
+        if (!items) {
+            log(`Plik "${file.name}" nie zawiera tablicy wydań (oczekiwano [...] lub { items: [...] }).`, 'error');
+            return;
+        }
+
+        let added = 0, duplicates = 0, invalid = 0;
+        for (const raw of items) {
+            const rawId = typeof raw?.id !== 'undefined' ? raw.id : raw?.currentId;
+            if (!raw || typeof rawId === 'undefined' || rawId === null) { invalid++; continue; }
+            const id = Number(rawId);
+            if (!Number.isFinite(id)) { invalid++; continue; }
+
+            const item = {
+                id,
+                title: raw.title || 'Nieznany tytuł',
+                artist: raw.artist || 'Nieznany artysta'
+            };
+
+            const isNew = addItemToMemory(item);
+            if (isNew) {
+                added++;
+                pendingNewItems.push(item);
+            } else {
+                duplicates++;
+            }
+        }
+
+        updateStatusBar();
+        renderSearchResults();
+        log(`Import "${file.name}": dodano ${added} nowych, ${duplicates} już było zapisanych${invalid ? `, ${invalid} pominięto (brak/zły id)` : ''}.`, 'info');
+        if (added > 0) {
+            setSaveStatus(`Zaimportowano ${added} nowych pozycji — kliknij "Wyślij nowe dane na hosting", żeby je zapisać na stałe.`);
+        }
     });
 
     // ============ POBIERANIE JEDNEGO ID (z retry i timeoutem) ============
@@ -358,102 +545,146 @@
         }
     }
 
-    // ============ PĘTLA SKANOWANIA (tylko w dół, ręczny stop) ============
-    async function scanLoop(startId) {
-        let cursor = startId !== null ? startId : minId - 1;
+    // ============ SKANOWANIE W DÓŁ OD PODANEGO ID — POMIJA JUŻ ZAPISANE, WYPEŁNIA LUKI ============
+    // Startuje od startId i schodzi w dół po kolei. Dla każdego ID: jeśli już jest w itemsMap
+    // (czyli mamy je zapisane), pomija bez wysyłania żądania sieciowego — tylko przesuwa się dalej.
+    // Jeśli ID nie jest zapisane, fetchuje je normalnie — dzięki temu wypełnia luki w już
+    // zeskanowanym zakresie. Po przejściu przez cały znany zakres (poniżej najniższego znanego ID)
+    // wszystko jest "nieznane", więc po prostu leci dalej jak zwykłe skanowanie w dół — nie
+    // zatrzymuje się tylko dlatego, że wyszło poza dotychczasowy zakres.
+    async function scanDownFillGaps(startId) {
+        let nextIdToAssign = startId;
+        let missStreak = 0;
+        let lastMilestoneAt = 0;
         let errorStreak = 0;
+        let boundaryLogged = false;
+        let safetyLogged = false;
+        let errorLogged = false;
+        let checkedSinceTick = 0;
+        let skippedTotal = 0;
 
-        log(`Start skanowania w dół od ID ${cursor}. Zatrzymasz przyciskiem "Zatrzymaj".`, 'info');
+        log(`Start uzupełniania luk: od ID ${startId} w dół, pomijam już zapisane ID, ${CONCURRENCY} żądań jednocześnie.`, 'info');
 
-        while (isRunning) {
-            const batchIds = [];
-            for (let i = 0; i < CONCURRENCY; i++) {
-                const id = cursor - i;
-                if (id < 1) break;
-                batchIds.push(id);
+        const speedEl = document.getElementById('statSpeed');
+        speedIntervalHandle = setInterval(() => {
+            speedEl.textContent = `${checkedSinceTick} ID/s`;
+            checkedSinceTick = 0;
+        }, SPEED_UPDATE_MS);
+
+        function claimNextId() {
+            let skipStart = null, skipEnd = null;
+            while (true) {
+                if (nextIdToAssign < 1) {
+                    if (skipStart !== null) {
+                        skippedTotal += (skipStart - skipEnd + 1);
+                        log(`… pominięto ${(skipStart - skipEnd + 1).toLocaleString('pl-PL')} już zapisanych ID (${skipStart} → ${skipEnd})`, 'info');
+                    }
+                    return null;
+                }
+                const id = nextIdToAssign;
+                nextIdToAssign--;
+                if (itemsMap.has(id)) {
+                    if (skipStart === null) skipStart = id;
+                    skipEnd = id;
+                    continue;
+                }
+                if (skipStart !== null) {
+                    skippedTotal += (skipStart - skipEnd + 1);
+                    log(`… pominięto ${(skipStart - skipEnd + 1).toLocaleString('pl-PL')} już zapisanych ID (${skipStart} → ${skipEnd})`, 'info');
+                }
+                return id;
             }
+        }
 
-            if (batchIds.length === 0) {
-                log('Zakończono: osiągnięto dolną granicę zakresu ID (1).', 'info');
-                break;
-            }
+        async function worker() {
+            while (isRunning) {
+                const id = claimNextId();
+                if (id === null) {
+                    if (!boundaryLogged) {
+                        boundaryLogged = true;
+                        log('Zakończono: osiągnięto dolną granicę zakresu ID (1).', 'info');
+                    }
+                    isRunning = false;
+                    break;
+                }
 
-            cursor = batchIds[batchIds.length - 1] - 1;
+                const res = await fetchOne(id);
+                checkedSinceTick++;
 
-            let results;
-            try {
-                results = await Promise.all(batchIds.map(id => fetchOne(id)));
-            } catch (err) {
-                log(`Nieoczekiwany błąd paczki: ${err.message}`, 'error');
-                results = batchIds.map(id => ({ id, status: 'error', message: err.message }));
-            }
-
-            results.sort((a, b) => b.id - a.id);
-
-            for (const res of results) {
                 if (res.status === 'found') {
                     const item = { id: res.id, title: res.title, artist: res.artist };
                     const isNew = addItemToMemory(item);
                     if (isNew) pendingNewItems.push(item);
+                    missStreak = 0;
+                    lastMilestoneAt = 0;
                     errorStreak = 0;
                     log(`✔ ID ${res.id} — "${res.title}" — ${res.artist}`, 'found');
+                    updateStatusBar();
                 } else if (res.status === 'notfound') {
+                    missStreak++;
                     errorStreak = 0;
                     log(`— ID ${res.id}: brak wydania (404)`, 'miss');
+                    if (missStreak - lastMilestoneAt >= MISS_MILESTONE) {
+                        lastMilestoneAt = missStreak;
+                        log(`Uwaga: ${missStreak} kolejnych ID bez wydania z rzędu — może to być zwykła przerwa w numeracji, skanowanie kontynuowane.`, 'info');
+                    }
+                    if (missStreak >= MISS_SAFETY_LIMIT) {
+                        if (!safetyLogged) {
+                            safetyLogged = true;
+                            log(`Przerwano (bezpiecznik): ${MISS_SAFETY_LIMIT} kolejnych ID bez wydania. To NIE musi oznaczać końca zakresu. Wznów ręcznie, jeśli chcesz kontynuować dalej w dół.`, 'error');
+                        }
+                        isRunning = false;
+                    }
                 } else if (res.status === 'error') {
                     errorStreak++;
                     log(`✖ ID ${res.id}: błąd — ${res.message}`, 'error');
+                    if (errorStreak >= ERROR_STREAK_LIMIT) {
+                        if (!errorLogged) {
+                            errorLogged = true;
+                            log(`Przerwano: ${ERROR_STREAK_LIMIT} kolejnych błędów sieci — sprawdź połączenie lub czy strona nie blokuje zapytań.`, 'error');
+                        }
+                        isRunning = false;
+                    }
                 }
             }
-
-            updateStatusBar();
-
-            if (errorStreak >= ERROR_STREAK_LIMIT) {
-                log(`Przerwano: ${ERROR_STREAK_LIMIT} kolejnych błędów sieci — sprawdź połączenie lub czy strona nie blokuje zapytań.`, 'error');
-                break;
-            }
-            if (cursor < 1) {
-                log('Zakończono: osiągnięto dolną granicę zakresu ID (1).', 'info');
-                break;
-            }
-
-            await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
         }
 
-        isRunning = false;
+        const workers = [];
+        for (let i = 0; i < CONCURRENCY; i++) workers.push(worker());
+        await Promise.all(workers);
+
+        clearInterval(speedIntervalHandle);
+        speedEl.textContent = '–';
         runningDirection = null;
         setButtonsForRunningState();
-        log('Skanowanie zatrzymane.', 'info');
+        log(`Uzupełnianie luk zatrzymane. Łącznie pominięto ${skippedTotal.toLocaleString('pl-PL')} już zapisanych ID.`, 'info');
     }
-
-    // ============ PRZYCISK (start/stop toggle) ============
-    function handleDownClick() {
-        if (isRunning) {
-            isRunning = false; // drugie kliknięcie zatrzymuje
-            log('Zatrzymywanie skanowania (po zakończeniu bieżącej paczki)...', 'info');
+    function handleGapFillClick() {
+        if (isRunning && runningDirection === 'gapfill') {
+            isRunning = false; // toggle: drugie kliknięcie zatrzymuje
+            log('Zatrzymywanie uzupełniania luk (po zakończeniu bieżących żądań)...', 'info');
             return;
         }
+        if (isRunning) return; // inny tryb już działa (przycisk i tak disabled)
 
-        const targetRaw = document.getElementById('targetIdInput').value.trim();
-        let startId = null;
-        if (targetRaw !== '') {
-            startId = parseInt(targetRaw, 10);
-            if (isNaN(startId) || startId < 1) {
-                log('Nieprawidłowe ID startowe.', 'error');
-                return;
-            }
-        } else if (minId === null) {
-            log('Brak danych startowych — podaj ID startowe albo poczekaj na wczytanie z Gist.', 'error');
+        const startRaw = document.getElementById('startIdInput').value.trim();
+        if (startRaw === '') {
+            log('Podaj ID startowe, od którego ma zacząć się skanowanie w dół.', 'error');
+            return;
+        }
+        const startId = parseInt(startRaw, 10);
+        if (isNaN(startId) || startId < 1) {
+            log('Nieprawidłowe ID startowe.', 'error');
             return;
         }
 
         isRunning = true;
-        runningDirection = 'down';
+        runningDirection = 'gapfill';
         setButtonsForRunningState();
-        scanLoop(startId);
+        scanDownFillGaps(startId);
     }
 
-    document.getElementById('downBtn').addEventListener('click', handleDownClick);
+    document.getElementById('gapFillBtn').addEventListener('click', handleGapFillClick);
 
     // ============ START APLIKACJI ============
     async function init() {
