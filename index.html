@@ -195,6 +195,17 @@
 
     <div class="panel">
         <div class="controls-row">
+            <label class="field-label" for="startIdInput">ID startowe:</label>
+            <input type="number" id="startIdInput" placeholder="np. 1350000">
+        </div>
+        <div class="controls-row">
+            <button id="gapFillBtn">⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)</button>
+        </div>
+        <div class="hint-text">Startuje od podanego ID i idzie w dół. Pomija (bez fetchowania) ID, które już masz zapisane — sprawdza tylko to, czego jeszcze nie ma. Dzięki temu wypełnia luki w już zeskanowanym zakresie, a po przejściu przez niego leci dalej w nieznane ID bez zatrzymywania się, dokładnie jak zwykłe „w dół”.</div>
+    </div>
+
+    <div class="panel">
+        <div class="controls-row">
             <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
             <input type="text" id="searchInput" placeholder="tytuł, artysta lub nazwa utworu...">
         </div>
@@ -325,12 +336,17 @@
     function setButtonsForRunningState() {
         const upBtn = document.getElementById('upBtn');
         const downBtn = document.getElementById('downBtn');
+        const gapFillBtn = document.getElementById('gapFillBtn');
         upBtn.classList.toggle('running', runningDirection === 'up');
         downBtn.classList.toggle('running', runningDirection === 'down');
+        gapFillBtn.classList.toggle('running', runningDirection === 'gapfill');
         upBtn.textContent = runningDirection === 'up' ? '⏹ Zatrzymaj (w górę)' : '▲ Idź w górę (nowsze)';
         downBtn.textContent = runningDirection === 'down' ? '⏹ Zatrzymaj (w dół)' : '▼ Idź w dół (starsze)';
-        upBtn.disabled = runningDirection === 'down';
-        downBtn.disabled = runningDirection === 'up';
+        gapFillBtn.textContent = runningDirection === 'gapfill' ? '⏹ Zatrzymaj (uzupełnianie luk)' : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
+        const otherRunning = isRunning && runningDirection !== null;
+        upBtn.disabled = otherRunning && runningDirection !== 'up';
+        downBtn.disabled = otherRunning && runningDirection !== 'down';
+        gapFillBtn.disabled = otherRunning && runningDirection !== 'gapfill';
     }
 
     // ============ WCZYTYWANIE Z GIST ============
@@ -660,7 +676,121 @@
         log('Skanowanie zatrzymane.', 'info');
     }
 
-    // ============ PRZYCISKI KIERUNKÓW (start/stop toggle) ============
+    // ============ SKANOWANIE W DÓŁ OD PODANEGO ID — POMIJA JUŻ ZAPISANE, WYPEŁNIA LUKI ============
+    // Startuje od startId i schodzi w dół po kolei. Dla każdego ID: jeśli już jest w itemsMap
+    // (czyli mamy je zapisane), pomija bez wysyłania żądania sieciowego — tylko przesuwa się dalej.
+    // Jeśli ID nie jest zapisane, fetchuje je normalnie — dzięki temu wypełnia luki w już
+    // zeskanowanym zakresie. Po przejściu przez cały znany zakres (poniżej najniższego znanego ID)
+    // wszystko jest "nieznane", więc po prostu leci dalej jak zwykłe skanowanie w dół — nie
+    // zatrzymuje się tylko dlatego, że wyszło poza dotychczasowy zakres.
+    async function scanDownFillGaps(startId) {
+        let nextIdToAssign = startId;
+        let missStreak = 0;
+        let lastMilestoneAt = 0;
+        let errorStreak = 0;
+        let boundaryLogged = false;
+        let safetyLogged = false;
+        let errorLogged = false;
+        let checkedSinceTick = 0;
+        let skippedTotal = 0;
+
+        log(`Start uzupełniania luk: od ID ${startId} w dół, pomijam już zapisane ID, ${CONCURRENCY} żądań jednocześnie.`, 'info');
+
+        const speedEl = document.getElementById('statSpeed');
+        speedIntervalHandle = setInterval(() => {
+            speedEl.textContent = `${checkedSinceTick} ID/s`;
+            checkedSinceTick = 0;
+        }, SPEED_UPDATE_MS);
+
+        function claimNextId() {
+            let skipStart = null, skipEnd = null;
+            while (true) {
+                if (nextIdToAssign < 1) {
+                    if (skipStart !== null) {
+                        skippedTotal += (skipStart - skipEnd + 1);
+                        log(`… pominięto ${(skipStart - skipEnd + 1).toLocaleString('pl-PL')} już zapisanych ID (${skipStart} → ${skipEnd})`, 'info');
+                    }
+                    return null;
+                }
+                const id = nextIdToAssign;
+                nextIdToAssign--;
+                if (itemsMap.has(id)) {
+                    if (skipStart === null) skipStart = id;
+                    skipEnd = id;
+                    continue;
+                }
+                if (skipStart !== null) {
+                    skippedTotal += (skipStart - skipEnd + 1);
+                    log(`… pominięto ${(skipStart - skipEnd + 1).toLocaleString('pl-PL')} już zapisanych ID (${skipStart} → ${skipEnd})`, 'info');
+                }
+                return id;
+            }
+        }
+
+        async function worker() {
+            while (isRunning) {
+                const id = claimNextId();
+                if (id === null) {
+                    if (!boundaryLogged) {
+                        boundaryLogged = true;
+                        log('Zakończono: osiągnięto dolną granicę zakresu ID (1).', 'info');
+                    }
+                    isRunning = false;
+                    break;
+                }
+
+                const res = await fetchOne(id);
+                checkedSinceTick++;
+
+                if (res.status === 'found') {
+                    const item = { currentId: res.id, title: res.title, artist: res.artist, tracks: res.tracks, targetUrl: res.targetUrl };
+                    const isNew = addItemToMemory(item);
+                    if (isNew) pendingNewItems.push(item);
+                    missStreak = 0;
+                    lastMilestoneAt = 0;
+                    errorStreak = 0;
+                    const trackInfo = res.tracks.length ? ` (${res.tracks.length} utw.)` : '';
+                    log(`✔ ID ${res.id} — "${res.title}" — ${res.artist}${trackInfo}`, 'found');
+                    updateStatusBar();
+                } else if (res.status === 'notfound') {
+                    missStreak++;
+                    errorStreak = 0;
+                    log(`— ID ${res.id}: brak wydania (404)`, 'miss');
+                    if (missStreak - lastMilestoneAt >= MISS_MILESTONE) {
+                        lastMilestoneAt = missStreak;
+                        log(`Uwaga: ${missStreak} kolejnych ID bez wydania z rzędu — może to być zwykła przerwa w numeracji, skanowanie kontynuowane.`, 'info');
+                    }
+                    if (missStreak >= MISS_SAFETY_LIMIT) {
+                        if (!safetyLogged) {
+                            safetyLogged = true;
+                            log(`Przerwano (bezpiecznik): ${MISS_SAFETY_LIMIT} kolejnych ID bez wydania. To NIE musi oznaczać końca zakresu. Wznów ręcznie, jeśli chcesz kontynuować dalej w dół.`, 'error');
+                        }
+                        isRunning = false;
+                    }
+                } else if (res.status === 'error') {
+                    errorStreak++;
+                    log(`✖ ID ${res.id}: błąd — ${res.message}`, 'error');
+                    if (errorStreak >= ERROR_STREAK_LIMIT) {
+                        if (!errorLogged) {
+                            errorLogged = true;
+                            log(`Przerwano: ${ERROR_STREAK_LIMIT} kolejnych błędów sieci — sprawdź połączenie lub czy strona nie blokuje zapytań.`, 'error');
+                        }
+                        isRunning = false;
+                    }
+                }
+            }
+        }
+
+        const workers = [];
+        for (let i = 0; i < CONCURRENCY; i++) workers.push(worker());
+        await Promise.all(workers);
+
+        clearInterval(speedIntervalHandle);
+        speedEl.textContent = '–';
+        runningDirection = null;
+        setButtonsForRunningState();
+        log(`Uzupełnianie luk zatrzymane. Łącznie pominięto ${skippedTotal.toLocaleString('pl-PL')} już zapisanych ID.`, 'info');
+    }
     function handleDirectionClick(direction) {
         if (isRunning && runningDirection === direction) {
             isRunning = false; // toggle: drugie kliknięcie zatrzymuje
@@ -696,6 +826,33 @@
 
     document.getElementById('upBtn').addEventListener('click', () => handleDirectionClick('up'));
     document.getElementById('downBtn').addEventListener('click', () => handleDirectionClick('down'));
+
+    function handleGapFillClick() {
+        if (isRunning && runningDirection === 'gapfill') {
+            isRunning = false; // toggle: drugie kliknięcie zatrzymuje
+            log('Zatrzymywanie uzupełniania luk (po zakończeniu bieżących żądań)...', 'info');
+            return;
+        }
+        if (isRunning) return; // inny tryb już działa (przycisk i tak disabled)
+
+        const startRaw = document.getElementById('startIdInput').value.trim();
+        if (startRaw === '') {
+            log('Podaj ID startowe, od którego ma zacząć się skanowanie w dół.', 'error');
+            return;
+        }
+        const startId = parseInt(startRaw, 10);
+        if (isNaN(startId) || startId < 1) {
+            log('Nieprawidłowe ID startowe.', 'error');
+            return;
+        }
+
+        isRunning = true;
+        runningDirection = 'gapfill';
+        setButtonsForRunningState();
+        scanDownFillGaps(startId);
+    }
+
+    document.getElementById('gapFillBtn').addEventListener('click', handleGapFillClick);
 
     // ============ START APLIKACJI ============
     async function init() {
