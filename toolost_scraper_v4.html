@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toolost Release Scanner</title>
+<style>
+    :root {
+        --bg: #f7f7ff;
+        --text: #000000;
+        --muted: #666666;
+        --panel-bg: #ffffff;
+        --border: #dcdce8;
+        --btn-bg: #000000;
+        --btn-text: #ffffff;
+        --btn-stop-bg: #b3261e;
+        --console-bg: #111114;
+        --console-text: #d8d8e0;
+        --ok: #4caf50;
+        --miss: #888888;
+        --err: #ff6b6b;
+        --info: #6cb6ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+        font-family: -apple-system, Segoe UI, Arial, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 24px;
+    }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { text-align: center; margin-bottom: 4px; font-size: 24px; }
+    .subtitle { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+
+    .panel {
+        background: var(--panel-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+    }
+    .status-item { text-align: center; }
+    .status-item .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .status-item .value { font-size: 18px; font-weight: 700; margin-top: 2px; }
+
+    .controls-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+    }
+    .controls-row + .controls-row { margin-top: 12px; }
+
+    label.field-label {
+        font-size: 12px;
+        color: var(--muted);
+        margin-right: 4px;
+    }
+
+    input[type="number"] {
+        padding: 9px 10px;
+        font-size: 14px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: #fff;
+        color: var(--text);
+        width: 160px;
+    }
+
+    button {
+        padding: 10px 16px;
+        font-size: 14px;
+        font-weight: 600;
+        background-color: var(--btn-bg);
+        color: var(--btn-text);
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    button.secondary { background-color: #333; }
+    button.running { background-color: var(--btn-stop-bg); }
+
+    .console-panel {
+        background: var(--console-bg);
+        color: var(--console-text);
+        border-radius: 12px;
+        padding: 14px 16px;
+        height: 440px;
+        overflow-y: auto;
+        font-family: "SF Mono", Consolas, Menlo, monospace;
+        font-size: 12.5px;
+        line-height: 1.55;
+    }
+    .log-line { white-space: pre-wrap; word-break: break-word; }
+    .log-found { color: var(--ok); }
+    .log-miss { color: var(--miss); }
+    .log-error { color: var(--err); }
+    .log-info { color: var(--info); font-weight: 600; }
+    .log-time { color: #666; margin-right: 6px; }
+
+    .save-status {
+        text-align: center;
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 10px;
+    }
+
+    @media (max-width: 600px) {
+        .controls-row { flex-direction: column; align-items: stretch; }
+        input[type="number"] { width: 100%; }
+    }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <h1>Toolost Release Scanner</h1>
+    <div class="subtitle">Skanowanie wydań release-preview po ID</div>
+
+    <div class="panel">
+        <div class="status-grid">
+            <div class="status-item">
+                <div class="label">Zapisanych wydań</div>
+                <div class="value" id="statTotal">–</div>
+            </div>
+            <div class="status-item">
+                <div class="label">Zakres ID</div>
+                <div class="value" id="statRange">–</div>
+            </div>
+            <div class="status-item">
+                <div class="label">Do wysłania</div>
+                <div class="value" id="statPending">0</div>
+            </div>
+            <div class="status-item">
+                <div class="label">Ostatni upload</div>
+                <div class="value" id="statUpload">–</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="controls-row">
+            <label class="field-label" for="targetIdInput">ID docelowe (opcjonalnie):</label>
+            <input type="number" id="targetIdInput" placeholder="np. 1350000">
+        </div>
+        <div class="controls-row">
+            <button id="upBtn">▲ Idź w górę</button>
+            <button id="downBtn">▼ Idź w dół</button>
+        </div>
+        <div class="controls-row">
+            <button id="uploadBtn" class="secondary">⬆️ Wyślij nowe dane na hosting</button>
+            <button id="exportBtn" class="secondary">💾 Eksportuj JSON (kopia zapasowa)</button>
+        </div>
+        <div class="save-status" id="saveStatus"></div>
+    </div>
+
+    <div class="console-panel" id="console"></div>
+</div>
+
+<script>
+    // ============ KONFIGURACJA ============
+    // ID Twojego Gista — samo ID jest bezpieczne w kodzie klienta (pozwala tylko na odczyt).
+    const GIST_ID = 'WKLEJ_TU_ID_SWOJEGO_GISTA';
+
+    const CONCURRENCY = 8;          // ile żądań równolegle w jednej paczce
+    const BATCH_DELAY_MS = 150;     // odstęp między paczkami
+    const REQUEST_TIMEOUT_MS = 15000;
+    const MISS_STREAK_LIMIT = 30;   // tyle kolejnych 404 = koniec wydań w tym kierunku
+    const ERROR_STREAK_LIMIT = 50;  // tyle kolejnych błędów sieci = przerwij (coś nie działa)
+    const MAX_LOG_LINES = 500;      // ile linii trzymamy w konsoli (starsze są usuwane)
+
+    // ============ STAN ============
+    let itemsMap = new Map();   // currentId -> item
+    let minId = null;
+    let maxId = null;
+    let pendingNewItems = [];
+    let lastChunkName = null;
+
+    let isRunning = false;
+    let runningDirection = null; // 'up' | 'down' | null
+    let isUploading = false;
+
+    // ============ POMOCNICZE ============
+    function toBase64(str) {
+        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
+            (m, p1) => String.fromCharCode('0x' + p1)));
+    }
+
+    const consoleEl = document.getElementById('console');
+    function log(message, type = 'info') {
+        const wasNearBottom = consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 60;
+        const line = document.createElement('div');
+        line.className = `log-line log-${type}`;
+        const time = new Date().toLocaleTimeString('pl-PL');
+        line.innerHTML = `<span class="log-time">${time}</span>${escapeHtml(message)}`;
+        consoleEl.appendChild(line);
+        while (consoleEl.children.length > MAX_LOG_LINES) {
+            consoleEl.removeChild(consoleEl.firstChild);
+        }
+        if (wasNearBottom) consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+    function escapeHtml(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function addItemToMemory(item) {
+        const isNew = !itemsMap.has(item.currentId);
+        itemsMap.set(item.currentId, item);
+        if (minId === null || item.currentId < minId) minId = item.currentId;
+        if (maxId === null || item.currentId > maxId) maxId = item.currentId;
+        return isNew;
+    }
+
+    function updateStatusBar() {
+        document.getElementById('statTotal').textContent = itemsMap.size.toLocaleString('pl-PL');
+        document.getElementById('statRange').textContent = (minId !== null && maxId !== null)
+            ? `${minId.toLocaleString('pl-PL')} – ${maxId.toLocaleString('pl-PL')}`
+            : '–';
+        document.getElementById('statPending').textContent = pendingNewItems.length.toLocaleString('pl-PL');
+    }
+
+    function setSaveStatus(text) {
+        document.getElementById('saveStatus').textContent = text;
+    }
+
+    function setButtonsForRunningState() {
+        const upBtn = document.getElementById('upBtn');
+        const downBtn = document.getElementById('downBtn');
+        upBtn.classList.toggle('running', runningDirection === 'up');
+        downBtn.classList.toggle('running', runningDirection === 'down');
+        upBtn.textContent = runningDirection === 'up' ? '⏹ Zatrzymaj (w górę)' : '▲ Idź w górę';
+        downBtn.textContent = runningDirection === 'down' ? '⏹ Zatrzymaj (w dół)' : '▼ Idź w dół';
+        upBtn.disabled = runningDirection === 'down';
+        downBtn.disabled = runningDirection === 'up';
+    }
+
+    // ============ WCZYTYWANIE Z GIST ============
+    async function loadFromGist() {
+        if (GIST_ID === 'WKLEJ_TU_ID_SWOJEGO_GISTA') {
+            log('Nie ustawiono GIST_ID w kodzie strony (patrz komentarz na górze skryptu).', 'error');
+            return;
+        }
+        log('Wczytywanie danych z Gist...', 'info');
+        try {
+            const resp = await fetch(`https://api.github.com/gists/${GIST_ID}`);
+            if (!resp.ok) {
+                log(`Nie udało się wczytać Gista (status ${resp.status}).`, 'error');
+                return;
+            }
+            const gist = await resp.json();
+            const chunkNames = Object.keys(gist.files).filter(n => /^chunk_\d+\.json$/.test(n)).sort();
+
+            for (const name of chunkNames) {
+                const file = gist.files[name];
+                let content = file.content;
+                if (file.truncated) {
+                    const rawResp = await fetch(file.raw_url);
+                    content = await rawResp.text();
+                }
+                try {
+                    JSON.parse(content).forEach(item => addItemToMemory(item));
+                } catch (e) {
+                    log(`Nie udało się odczytać pliku ${name} z Gista.`, 'error');
+                }
+            }
+            lastChunkName = chunkNames.length ? chunkNames[chunkNames.length - 1] : null;
+            updateStatusBar();
+            log(`Wczytano ${itemsMap.size.toLocaleString('pl-PL')} wydań z Gist (zakres ID ${minId}–${maxId}).`, 'info');
+        } catch (err) {
+            log(`Błąd sieci przy wczytywaniu z Gist: ${err.message}`, 'error');
+        }
+    }
+
+    // ============ UPLOAD DO GIST (ręczny) ============
+    async function uploadToGist() {
+        if (isUploading) return;
+        if (pendingNewItems.length === 0) {
+            setSaveStatus('Brak nowych pozycji do wysłania.');
+            return;
+        }
+        isUploading = true;
+        document.getElementById('uploadBtn').disabled = true;
+        const toSend = pendingNewItems;
+        pendingNewItems = [];
+        updateStatusBar();
+
+        setSaveStatus(`Wysyłanie ${toSend.length} pozycji na hosting...`);
+        try {
+            const resp = await fetch('/api/save-gist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: toSend, lastChunkName })
+            });
+            const result = await resp.json();
+            if (!resp.ok || !result.ok) {
+                pendingNewItems = toSend.concat(pendingNewItems);
+                updateStatusBar();
+                setSaveStatus(`Błąd zapisu: ${result.error || resp.status}`);
+                log(`Nie udało się wysłać danych na hosting: ${result.error || resp.status}`, 'error');
+            } else {
+                if (result.lastChunkName) lastChunkName = result.lastChunkName;
+                const now = new Date().toLocaleTimeString('pl-PL');
+                document.getElementById('statUpload').textContent = now;
+                setSaveStatus(`Zapisano ${toSend.length} pozycji na hostingu (${now}).`);
+                log(`Wysłano ${toSend.length} nowych wydań na hosting.`, 'info');
+            }
+        } catch (err) {
+            pendingNewItems = toSend.concat(pendingNewItems);
+            updateStatusBar();
+            setSaveStatus(`Błąd sieci przy wysyłaniu: ${err.message}`);
+            log(`Błąd sieci przy wysyłaniu na hosting: ${err.message}`, 'error');
+        }
+        isUploading = false;
+        document.getElementById('uploadBtn').disabled = false;
+    }
+    document.getElementById('uploadBtn').addEventListener('click', uploadToGist);
+
+    // ============ EKSPORT LOKALNY (kopia zapasowa) ============
+    document.getElementById('exportBtn').addEventListener('click', () => {
+        const allItems = Array.from(itemsMap.values()).sort((a, b) => a.currentId - b.currentId);
+        const blob = new Blob([JSON.stringify(allItems)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `toolost_backup_${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        log(`Wyeksportowano lokalną kopię zapasową (${allItems.length} pozycji).`, 'info');
+    });
+
+    // ============ POBIERANIE JEDNEGO ID (z retry i timeoutem) ============
+    async function fetchOne(id, attempt) {
+        attempt = attempt || 1;
+        const encodedId = toBase64(id.toString());
+        const url = `https://toolost.com/release-preview/${encodedId}`;
+        const controller = new AbortController();
+        const timeoutHandle = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+        try {
+            const resp = await fetch(url, { method: 'GET', mode: 'cors', signal: controller.signal });
+            clearTimeout(timeoutHandle);
+
+            if (resp.status === 404) return { id, status: 'notfound' };
+            if (!resp.ok) {
+                if (attempt < 2) return fetchOne(id, attempt + 1);
+                return { id, status: 'error', message: `HTTP ${resp.status}` };
+            }
+
+            const html = await resp.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const titleEl = doc.querySelector('.rp-title');
+            if (!titleEl) return { id, status: 'notfound' };
+
+            const artistEl = doc.querySelector('.rp-artists');
+            const title = titleEl.textContent.trim();
+            const artist = artistEl ? artistEl.textContent.trim() : 'Nieznany artysta';
+            const tracks = [];
+            doc.querySelectorAll('.rp-track__info').forEach(t => {
+                tracks.push({
+                    name: t.querySelector('.rp-track__name')?.textContent.trim() || '',
+                    artist: t.querySelector('.rp-track__artist')?.textContent.trim() || ''
+                });
+            });
+            return { id, status: 'found', title, artist, tracks, targetUrl: url };
+        } catch (err) {
+            clearTimeout(timeoutHandle);
+            if (attempt < 2) return fetchOne(id, attempt + 1);
+            return { id, status: 'error', message: err.name === 'AbortError' ? 'przekroczono czas oczekiwania' : err.message };
+        }
+    }
+
+    // ============ PĘTLA SKANOWANIA ============
+    async function scanLoop(direction, targetId) {
+        let cursor = direction === 'up' ? maxId + 1 : minId - 1;
+        let missStreak = 0;
+        let errorStreak = 0;
+
+        log(`Start skanowania: kierunek ${direction === 'up' ? 'w górę' : 'w dół'}, od ID ${cursor}${targetId !== null ? ` do ${targetId}` : ''}.`, 'info');
+
+        while (isRunning) {
+            const batchIds = [];
+            for (let i = 0; i < CONCURRENCY; i++) {
+                const id = direction === 'up' ? cursor + i : cursor - i;
+                if (id < 1) break;
+                if (targetId !== null) {
+                    if (direction === 'up' && id > targetId) break;
+                    if (direction === 'down' && id < targetId) break;
+                }
+                batchIds.push(id);
+            }
+
+            if (batchIds.length === 0) {
+                log('Osiągnięto ID docelowe lub granicę zakresu.', 'info');
+                break;
+            }
+
+            cursor = direction === 'up'
+                ? batchIds[batchIds.length - 1] + 1
+                : batchIds[batchIds.length - 1] - 1;
+
+            let results;
+            try {
+                results = await Promise.all(batchIds.map(id => fetchOne(id)));
+            } catch (err) {
+                log(`Nieoczekiwany błąd paczki: ${err.message}`, 'error');
+                results = batchIds.map(id => ({ id, status: 'error', message: err.message }));
+            }
+
+            results.sort((a, b) => direction === 'up' ? a.id - b.id : b.id - a.id);
+
+            for (const res of results) {
+                if (res.status === 'found') {
+                    const item = { currentId: res.id, title: res.title, artist: res.artist, tracks: res.tracks, targetUrl: res.targetUrl };
+                    const isNew = addItemToMemory(item);
+                    if (isNew) pendingNewItems.push(item);
+                    missStreak = 0;
+                    errorStreak = 0;
+                    const trackInfo = res.tracks.length ? ` (${res.tracks.length} utw.)` : '';
+                    log(`✔ ID ${res.id} — "${res.title}" — ${res.artist}${trackInfo}`, 'found');
+                } else if (res.status === 'notfound') {
+                    missStreak++;
+                    errorStreak = 0;
+                    log(`— ID ${res.id}: brak wydania (404)`, 'miss');
+                } else if (res.status === 'error') {
+                    errorStreak++;
+                    log(`✖ ID ${res.id}: błąd — ${res.message}`, 'error');
+                }
+            }
+
+            updateStatusBar();
+
+            if (missStreak >= MISS_STREAK_LIMIT) {
+                log(`Zatrzymano: ${MISS_STREAK_LIMIT} kolejnych ID bez wydania — to prawdopodobnie koniec dostępnych ID w tym kierunku.`, 'info');
+                break;
+            }
+            if (errorStreak >= ERROR_STREAK_LIMIT) {
+                log(`Przerwano: ${ERROR_STREAK_LIMIT} kolejnych błędów sieci — sprawdź połączenie lub czy strona nie blokuje zapytań.`, 'error');
+                break;
+            }
+            if (targetId !== null) {
+                if ((direction === 'up' && cursor > targetId) || (direction === 'down' && cursor < targetId)) {
+                    log(`Zakończono: osiągnięto ID docelowe ${targetId}.`, 'info');
+                    break;
+                }
+            }
+            if (cursor < 1) {
+                log('Zakończono: osiągnięto dolną granicę zakresu ID (1).', 'info');
+                break;
+            }
+
+            await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+        }
+
+        isRunning = false;
+        runningDirection = null;
+        setButtonsForRunningState();
+        log('Skanowanie zatrzymane.', 'info');
+    }
+
+    // ============ PRZYCISKI KIERUNKÓW (start/stop toggle) ============
+    function handleDirectionClick(direction) {
+        if (isRunning && runningDirection === direction) {
+            isRunning = false; // toggle: drugie kliknięcie zatrzymuje
+            log('Zatrzymywanie skanowania (po zakończeniu bieżącej paczki)...', 'info');
+            return;
+        }
+        if (isRunning) return; // druga kierunek jest zablokowany podczas skanowania (przycisk i tak disabled)
+
+        if (direction === 'up' && maxId === null) {
+            log('Brak danych startowych — najpierw wgraj dane początkowe (patrz seed-gist.js) albo poczekaj na wczytanie z Gist.', 'error');
+            return;
+        }
+        if (direction === 'down' && minId === null) {
+            log('Brak danych startowych — najpierw wgraj dane początkowe (patrz seed-gist.js) albo poczekaj na wczytanie z Gist.', 'error');
+            return;
+        }
+
+        const targetRaw = document.getElementById('targetIdInput').value.trim();
+        let targetId = null;
+        if (targetRaw !== '') {
+            targetId = parseInt(targetRaw, 10);
+            if (isNaN(targetId) || targetId < 1) {
+                log('Nieprawidłowe ID docelowe.', 'error');
+                return;
+            }
+        }
+
+        isRunning = true;
+        runningDirection = direction;
+        setButtonsForRunningState();
+        scanLoop(direction, targetId);
+    }
+
+    document.getElementById('upBtn').addEventListener('click', () => handleDirectionClick('up'));
+    document.getElementById('downBtn').addEventListener('click', () => handleDirectionClick('down'));
+
+    // ============ START APLIKACJI ============
+    async function init() {
+        setButtonsForRunningState();
+        updateStatusBar();
+        await loadFromGist();
+        updateStatusBar();
+    }
+    init();
+</script>
+</body>
+</html>
