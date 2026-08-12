@@ -216,6 +216,7 @@
     const ERROR_STREAK_LIMIT = 50;  // tyle kolejnych błędów sieci = przerwij (coś nie działa)
     const MAX_LOG_LINES = 500;      // ile linii trzymamy w konsoli (starsze są usuwane)
     const SPEED_UPDATE_MS = 1000;   // jak często odświeżamy licznik ID/s
+    const UPLOAD_BATCH_BYTES = 300 * 1024; // maks. rozmiar JSON-a jednej paczki wysyłanej do /api/save-gist (bezpiecznie poniżej limitu payloadu Vercela)
 
     // ============ STAN ============
     let itemsMap = new Map();   // currentId -> item
@@ -362,6 +363,25 @@
     }
 
     // ============ UPLOAD DO GIST (ręczny) ============
+    // ============ WYSYŁANIE NA HOSTING (w paczkach — jeden request nie może być za duży) ============
+    function makeUploadBatches(items, maxBytes) {
+        const batches = [];
+        let current = [];
+        let currentSize = 2; // nawiasy tablicy
+        for (const item of items) {
+            const itemSize = JSON.stringify(item).length + 1;
+            if (current.length > 0 && currentSize + itemSize > maxBytes) {
+                batches.push(current);
+                current = [];
+                currentSize = 2;
+            }
+            current.push(item);
+            currentSize += itemSize;
+        }
+        if (current.length > 0) batches.push(current);
+        return batches;
+    }
+
     async function uploadToGist() {
         if (isUploading) return;
         if (pendingNewItems.length === 0) {
@@ -374,32 +394,48 @@
         pendingNewItems = [];
         updateStatusBar();
 
-        setSaveStatus(`Wysyłanie ${toSend.length} pozycji na hosting...`);
-        try {
-            const resp = await fetch('/api/save-gist', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: toSend, lastChunkName })
-            });
-            const result = await resp.json();
-            if (!resp.ok || !result.ok) {
-                pendingNewItems = toSend.concat(pendingNewItems);
-                updateStatusBar();
-                setSaveStatus(`Błąd zapisu: ${result.error || resp.status}`);
-                log(`Nie udało się wysłać danych na hosting: ${result.error || resp.status}`, 'error');
-            } else {
+        const batches = makeUploadBatches(toSend, UPLOAD_BATCH_BYTES);
+        log(`Wysyłanie ${toSend.length} pozycji na hosting w ${batches.length} paczkach (limit ~${Math.round(UPLOAD_BATCH_BYTES / 1024)}KB/paczkę)...`, 'info');
+
+        let totalSent = 0;
+        for (let i = 0; i < batches.length; i++) {
+            const batch = batches[i];
+            setSaveStatus(`Wysyłanie paczki ${i + 1}/${batches.length} (${batch.length} pozycji)...`);
+            try {
+                const resp = await fetch('/api/save-gist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: batch, lastChunkName })
+                });
+                const result = await resp.json();
+                if (!resp.ok || !result.ok) {
+                    const remaining = batch.concat(...batches.slice(i + 1));
+                    pendingNewItems = remaining.concat(pendingNewItems);
+                    updateStatusBar();
+                    setSaveStatus(`Błąd zapisu przy paczce ${i + 1}/${batches.length}: ${result.error || resp.status}. Reszta wróciła do kolejki — spróbuj ponownie.`);
+                    log(`Nie udało się wysłać paczki ${i + 1}/${batches.length}: ${result.error || resp.status}`, 'error');
+                    break;
+                }
                 if (result.lastChunkName) lastChunkName = result.lastChunkName;
-                const now = new Date().toLocaleTimeString('pl-PL');
-                document.getElementById('statUpload').textContent = now;
-                setSaveStatus(`Zapisano ${toSend.length} pozycji na hostingu (${now}).`);
-                log(`Wysłano ${toSend.length} nowych wydań na hosting.`, 'info');
+                totalSent += batch.length;
+                log(`Wysłano paczkę ${i + 1}/${batches.length} (${batch.length} pozycji).`, 'info');
+            } catch (err) {
+                const remaining = batch.concat(...batches.slice(i + 1));
+                pendingNewItems = remaining.concat(pendingNewItems);
+                updateStatusBar();
+                setSaveStatus(`Błąd sieci przy paczce ${i + 1}/${batches.length}: ${err.message}. Reszta wróciła do kolejki — spróbuj ponownie.`);
+                log(`Błąd sieci przy wysyłaniu paczki ${i + 1}/${batches.length}: ${err.message}`, 'error');
+                break;
             }
-        } catch (err) {
-            pendingNewItems = toSend.concat(pendingNewItems);
-            updateStatusBar();
-            setSaveStatus(`Błąd sieci przy wysyłaniu: ${err.message}`);
-            log(`Błąd sieci przy wysyłaniu na hosting: ${err.message}`, 'error');
         }
+
+        if (totalSent === toSend.length) {
+            const now = new Date().toLocaleTimeString('pl-PL');
+            document.getElementById('statUpload').textContent = now;
+            setSaveStatus(`Zapisano ${totalSent} pozycji na hostingu (${now}).`);
+            log(`Wysłano łącznie ${totalSent} nowych wydań na hosting (${batches.length} paczek).`, 'info');
+        }
+
         isUploading = false;
         document.getElementById('uploadBtn').disabled = false;
     }
