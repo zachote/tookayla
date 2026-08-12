@@ -186,6 +186,8 @@
         <div class="controls-row">
             <button id="uploadBtn" class="secondary">⬆️ Wyślij nowe dane na hosting</button>
             <button id="exportBtn" class="secondary">💾 Eksportuj JSON (kopia zapasowa)</button>
+            <button id="importBtn" class="secondary">📥 Importuj JSON</button>
+            <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
         </div>
         <div class="save-status" id="saveStatus"></div>
         <div class="hint-text">Skanowanie „w górę”/„w dół” nie kończy się przy pierwszej dłuższej serii brakujących ID (to może być zwykła przerwa w numeracji) — kontynuuje aż do ID docelowego, ręcznego zatrzymania albo bardzo długiej serii braków (bezpiecznik).</div>
@@ -416,6 +418,65 @@
         a.remove();
         URL.revokeObjectURL(url);
         log(`Wyeksportowano lokalną kopię zapasową (${allItems.length} pozycji).`, 'info');
+    });
+
+    // ============ IMPORT LOKALNY (z pliku JSON) ============
+    // Akceptuje zarówno plik z eksportu (tablica pozycji), jak i pojedynczy "chunk_*.json" z Gista.
+    // Nowe pozycje trafiają do itemsMap (widoczne od razu w wyszukiwarce) i do pendingNewItems,
+    // żeby dało się je normalnie wysłać przyciskiem "Wyślij nowe dane na hosting".
+    document.getElementById('importBtn').addEventListener('click', () => {
+        document.getElementById('importFileInput').click();
+    });
+
+    document.getElementById('importFileInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        e.target.value = ''; // pozwala wybrać ten sam plik ponownie później
+        if (!file) return;
+
+        let parsed;
+        try {
+            const text = await file.text();
+            parsed = JSON.parse(text);
+        } catch (err) {
+            log(`Nie udało się odczytać pliku "${file.name}": ${err.message}`, 'error');
+            return;
+        }
+
+        const items = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.items) ? parsed.items : null);
+        if (!items) {
+            log(`Plik "${file.name}" nie zawiera tablicy wydań (oczekiwano [...] lub { items: [...] }).`, 'error');
+            return;
+        }
+
+        let added = 0, duplicates = 0, invalid = 0;
+        for (const raw of items) {
+            if (!raw || typeof raw.currentId === 'undefined' || raw.currentId === null) { invalid++; continue; }
+            const currentId = Number(raw.currentId);
+            if (!Number.isFinite(currentId)) { invalid++; continue; }
+
+            const item = {
+                currentId,
+                title: raw.title || 'Nieznany tytuł',
+                artist: raw.artist || 'Nieznany artysta',
+                tracks: Array.isArray(raw.tracks) ? raw.tracks : [],
+                targetUrl: raw.targetUrl || `https://toolost.com/release-preview/${toBase64(currentId.toString())}`
+            };
+
+            const isNew = addItemToMemory(item);
+            if (isNew) {
+                added++;
+                pendingNewItems.push(item);
+            } else {
+                duplicates++;
+            }
+        }
+
+        updateStatusBar();
+        renderSearchResults();
+        log(`Import "${file.name}": dodano ${added} nowych, ${duplicates} już było zapisanych${invalid ? `, ${invalid} pominięto (brak/zły currentId)` : ''}.`, 'info');
+        if (added > 0) {
+            setSaveStatus(`Zaimportowano ${added} nowych pozycji — kliknij "Wyślij nowe dane na hosting", żeby je zapisać na stałe.`);
+        }
     });
 
     // ============ POBIERANIE JEDNEGO ID (z retry i timeoutem) ============
