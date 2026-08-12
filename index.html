@@ -246,13 +246,7 @@
 
     // ============ WCZYTYWANIE Z GIST ============
     async function loadFromGist() {
-        if (GIST_ID === '2f3945ff4ab15e56a30cb733f6549d34') {
-            log('Nie ustawiono GIST_ID w kodzie strony (patrz komentarz na górze skryptu).', 'error');
-            return;
-        }
-        log('Wczytywanie danych z Gist...', 'info');
-        try {
-            const resp = await fetch(`https://api.github.com/gists/${GIST_ID}`);
+            const resp = await fetch(`https://api.github.com/gists/2f3945ff4ab15e56a30cb733f6549d34`);
             if (!resp.ok) {
                 log(`Nie udało się wczytać Gista (status ${resp.status}).`, 'error');
                 return;
@@ -276,9 +270,6 @@
             lastChunkName = chunkNames.length ? chunkNames[chunkNames.length - 1] : null;
             updateStatusBar();
             log(`Wczytano ${itemsMap.size.toLocaleString('pl-PL')} wydań z Gist (zakres ID ${minId}–${maxId}).`, 'info');
-        } catch (err) {
-            log(`Błąd sieci przy wczytywaniu z Gist: ${err.message}`, 'error');
-        }
     }
 
     // ============ UPLOAD DO GIST (ręczny) ============
