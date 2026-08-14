@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Toolost Release Scanner</title>
+<title>TooKayla</title>
 <style>
     :root {
         --bg: #f2f1f8;
@@ -261,15 +261,15 @@
                     </div>
                 </div>
                 <div class="mini-stats">
-                    <div class="mini-stat"><b id="statArtists">5</b><span>artystów</span></div><div class="mini-stat"><b id="sessionFound">0</b><span>znaleziono</span></div><div class="mini-stat"><b id="sessionMiss">0</b><span>404</span></div><div class="mini-stat"><b id="sessionErrors">0</b><span>błędy</span></div><div class="mini-stat"><b id="sessionChecked">0</b><span>sprawdzono</span></div><div class="mini-stat"><b id="lastChecked">–</b><span>ostatnie ID</span></div>
+                    <div class="mini-stat"><b id="sessionFound">0</b><span>znaleziono</span></div><div class="mini-stat"><b id="sessionMiss">0</b><span>404</span></div><div class="mini-stat"><b id="sessionErrors">0</b><span>błędy</span></div><div class="mini-stat"><b id="sessionChecked">0</b><span>sprawdzono</span></div><div class="mini-stat"><b id="lastChecked">–</b><span>ostatnie ID</span></div>
                 </div>
                 <div class="progress"><div id="scanProgress"></div></div><div class="scan-meta"><span id="progressText">Brak aktywnego skanu</span><span id="etaText">–</span></div>
             </div>
 
             <div class="panel alt">
                 <div class="controls-row">
-                    <button id="uploadBtn" class="secondary">⬆️ Wyślij nowe dane na hosting</button>
-                    <button id="exportBtn" class="secondary">💾 Eksportuj JSON (kopia zapasowa)</button>
+                    <button id="uploadBtn" class="secondary">⬆️ Zuploaduj nowe dane</button>
+                    <button id="exportBtn" class="secondary">💾 Eksportuj JSON</button>
                     <button id="importBtn" class="secondary">📥 Importuj JSON</button>
                     <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
                 </div>
@@ -284,10 +284,9 @@
                     <label class="field-label" for="workerInput">Workerów:</label><input type="number" id="workerInput" min="1" max="64" value="16">
                 </div>
                 <div class="controls-row">
-                    <button id="gapFillBtn">⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)</button>
+                    <button id="gapFillBtn">⬇ Skanuj w dół od ID</button>
                     <button id="pauseResumeBtn" class="secondary" disabled>▶ Wznów</button>
                 </div>
-                <div class="hint-text">Startuje od podanego ID i idzie w dół. Pomija (bez fetchowania) ID, które już masz zapisane — sprawdza tylko to, czego jeszcze nie ma. Dzięki temu wypełnia luki w już zeskanowanym zakresie, a po przejściu przez niego leci dalej w nieznane ID bez zatrzymywania się, dokładnie jak zwykłe „w dół”.</div>
             </div>
 
             <div class="panel alt">
@@ -295,7 +294,7 @@
                     <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
                     <input type="text" id="searchInput" placeholder="tytuł, artysta lub ID...">
                 </div>
-                <div class="extra-toolbar" id="extraToolbar" style="display:none">
+                <div class="extra-toolbar" id="extraToolbar">
                     <button type="button" id="clearSearchBtn" class="secondary">✕ Wyczyść</button>
                 </div>
                 <div id="searchResults" class="search-results"></div>
@@ -445,8 +444,6 @@
     let lastScan={nextId:null,endId:null};
     function updateSessionUI(){for(const [id,val] of [['sessionFound',session.found],['sessionMiss',session.miss],['sessionErrors',session.errors],['sessionChecked',session.checked]]) document.getElementById(id).textContent=val.toLocaleString('pl-PL');document.getElementById('lastChecked').textContent=session.lastId==null?'–':session.lastId.toLocaleString('pl-PL');}
     function exportItems(items,name){const blob=new Blob([JSON.stringify(items.sort((a,b)=>a.id-b.id),null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
-    document.getElementById('clearSearchBtn').addEventListener('click',()=>{searchInput.value='';setBrowseMode('search');});
-    document.getElementById('exportRangeBtn').addEventListener('click',exportRange);
     document.getElementById('workerInput').addEventListener('change',e=>{e.target.value=Math.max(1,Math.min(64,Number(e.target.value)||16));});
 
     function setButtonsForRunningState() {
@@ -454,7 +451,7 @@
         const pauseResumeBtn = document.getElementById('pauseResumeBtn');
 
         gapFillBtn.classList.toggle('running', isRunning && !isPaused);
-        gapFillBtn.textContent = isRunning ? '⏹ Zatrzymaj skan' : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
+        gapFillBtn.textContent = isRunning ? '⏹ Zatrzymaj skan' : '⬇ Skanuj w dół od ID';
         gapFillBtn.disabled = isRunning;
 
         pauseResumeBtn.disabled = !isRunning;
