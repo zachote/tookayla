@@ -16,7 +16,7 @@
         --btn-stop-bg: #b3261e;
         --console-bg: #111114;
         --console-text: #d8d8e0;
-        --ok: #4caf50;
+        --ok: #ffffff;
         --miss: #888888;
         --err: #ff6b6b;
         --info: #6cb6ff;
@@ -127,11 +127,108 @@
         line-height: 1.55;
     }
     .log-line { white-space: pre-wrap; word-break: break-word; }
-    .log-found { color: var(--ok); }
+    .log-found { color: var(--ok); font-weight: 600; }
     .log-miss { color: var(--miss); }
     .log-error { color: var(--err); }
     .log-info { color: var(--info); font-weight: 600; }
     .log-time { color: #666; margin-right: 6px; }
+
+    select {
+        padding: 10px 12px;
+        font-size: 14px;
+        border-radius: 8px;
+        border: none;
+        background: var(--panel-bg-alt);
+        color: var(--text);
+        font-family: inherit;
+    }
+    select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+
+    mark.hl { background: var(--accent); color: #fff; padding: 0 2px; border-radius: 3px; }
+
+    .load-more-btn { width: 100%; margin-top: 4px; }
+
+    /* ---- Zapisani artyści (ulubieni) ---- */
+    .fav-input-wrap { position: relative; flex: 1; min-width: 200px; }
+    .fav-suggestions {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: var(--panel-bg);
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        max-height: 220px;
+        overflow-y: auto;
+        z-index: 20;
+    }
+    .fav-suggestion-item {
+        padding: 8px 12px;
+        font-size: 13px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .fav-suggestion-item:hover { background: var(--panel-bg-alt); }
+    .fav-suggestion-count { color: var(--muted); font-size: 11.5px; }
+
+    .favorites-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .favorite-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--panel-bg-alt);
+        border-radius: 999px;
+        padding: 6px 8px 6px 14px;
+        font-size: 13px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: border-color .15s;
+    }
+    .favorite-chip:hover { border-color: var(--accent); }
+    .favorite-chip-name { font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .favorite-chip-count {
+        background: var(--accent);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 1px 7px;
+    }
+    .favorite-chip-remove {
+        background: transparent;
+        border: none;
+        color: var(--muted);
+        font-size: 13px;
+        cursor: pointer;
+        padding: 0 2px;
+        line-height: 1;
+    }
+    .favorite-chip-remove:hover { color: var(--err); }
+
+    /* ---- Wyszukiwanie zbiorcze ---- */
+    .bulk-panel { margin-top: 14px; }
+    textarea#bulkTextarea {
+        width: 100%;
+        min-height: 90px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: none;
+        background: var(--panel-bg-alt);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13.5px;
+        resize: vertical;
+    }
+    textarea#bulkTextarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+    .bulk-controls-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+    .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+    .bulk-summary { font-size: 12px; color: var(--muted); margin-bottom: 10px; text-align: center; }
+    .bulk-group { margin-bottom: 14px; }
+    .bulk-group-header { font-weight: 700; font-size: 13px; margin-bottom: 6px; color: var(--text); }
+    .bulk-group-header-empty { color: var(--muted); font-weight: 600; }
 
     .save-status {
         text-align: center;
@@ -226,7 +323,57 @@
                     <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
                     <input type="text" id="searchInput" placeholder="tytuł lub artysta...">
                 </div>
+                <div class="controls-row">
+                    <label class="field-label" for="searchScope">Zakres:</label>
+                    <select id="searchScope">
+                        <option value="all">Tytuł + artysta</option>
+                        <option value="artist">Tylko artysta</option>
+                        <option value="title">Tylko tytuł</option>
+                    </select>
+                    <label class="field-label" for="searchSort">Sortuj:</label>
+                    <select id="searchSort">
+                        <option value="id_desc">Najnowsze (ID malejąco)</option>
+                        <option value="id_asc">Najstarsze (ID rosnąco)</option>
+                        <option value="title_asc">Tytuł A–Z</option>
+                        <option value="artist_asc">Artysta A–Z</option>
+                    </select>
+                </div>
                 <div id="searchResults" class="search-results"></div>
+            </div>
+
+            <div class="panel">
+                <div class="controls-row">
+                    <label class="field-label">⭐ Zapisani artyści</label>
+                </div>
+                <div class="controls-row">
+                    <div class="fav-input-wrap">
+                        <input type="text" id="favArtistInput" placeholder="wpisz nazwę artysty i Enter, np. BJ Lips...">
+                        <div id="favSuggestions" class="fav-suggestions"></div>
+                    </div>
+                    <button id="favAddBtn" class="secondary">+ Dodaj</button>
+                </div>
+                <div id="favoritesList" class="favorites-wrap"></div>
+                <div class="hint-text">Kliknij artystę na liście, aby od razu zobaczyć wszystkie jego zapisane wydania w przeglądarce powyżej. Liczba przy nazwie to ile wydań masz już zapisanych.</div>
+            </div>
+
+            <div class="panel alt">
+                <div class="controls-row">
+                    <button id="bulkToggleBtn" class="secondary" type="button">🔎 Wyszukiwanie zbiorcze (wiele naraz)</button>
+                </div>
+                <div id="bulkPanel" class="bulk-panel" style="display:none;">
+                    <textarea id="bulkTextarea" placeholder="Wklej listę — jedno zapytanie (artysta lub tytuł) na linię, np.&#10;BJ Lips&#10;Young Igi&#10;Kaz Bałagane"></textarea>
+                    <div class="bulk-controls-row">
+                        <label class="field-label" for="bulkScope">Zakres:</label>
+                        <select id="bulkScope">
+                            <option value="artist">Tylko artysta</option>
+                            <option value="all">Tytuł + artysta</option>
+                            <option value="title">Tylko tytuł</option>
+                        </select>
+                        <label class="checkbox-label"><input type="checkbox" id="bulkOnlyMissing"> Pokaż tylko bez trafień</label>
+                        <button id="bulkSearchBtn" type="button">Szukaj wszystkich</button>
+                    </div>
+                    <div id="bulkResults"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -252,6 +399,8 @@
     let maxId = null;
     let pendingNewItems = [];
     let lastChunkName = null;
+    let artistCounts = new Map(); // znormalizowana nazwa artysty -> { display, count }
+    let favorites = [];           // zapisani (ulubieni) artyści — nazwy wyświetlane
 
     let isRunning = false;
     let runningDirection = null; // 'up' | 'down' | null
@@ -286,6 +435,12 @@
         itemsMap.set(item.id, item);
         if (minId === null || item.id < minId) minId = item.id;
         if (maxId === null || item.id > maxId) maxId = item.id;
+        if (isNew) {
+            const key = normalizeSearch(item.artist);
+            const entry = artistCounts.get(key);
+            if (entry) entry.count++;
+            else artistCounts.set(key, { display: item.artist, count: 1 });
+        }
         return isNew;
     }
 
@@ -295,6 +450,7 @@
             ? `${minId.toLocaleString('pl-PL')} – ${maxId.toLocaleString('pl-PL')}`
             : '–';
         document.getElementById('statPending').textContent = pendingNewItems.length.toLocaleString('pl-PL');
+        renderFavorites();
     }
 
     function setSaveStatus(text) {
@@ -317,10 +473,62 @@
     function normalizeSearch(s) {
         return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
+    function escapeRegex(s) {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    function highlightText(text, rawTerms) {
+        const escaped = escapeHtml(text || '');
+        const cleanTerms = (rawTerms || []).filter(Boolean);
+        if (cleanTerms.length === 0) return escaped;
+        const pattern = cleanTerms.slice().sort((a, b) => b.length - a.length).map(escapeRegex).join('|');
+        if (!pattern) return escaped;
+        try {
+            const re = new RegExp(`(${pattern})`, 'gi');
+            return escaped.replace(re, '<mark class="hl">$1</mark>');
+        } catch {
+            return escaped;
+        }
+    }
+    function itemMatchesScope(item, terms, scope) {
+        let hay;
+        if (scope === 'artist') hay = normalizeSearch(item.artist);
+        else if (scope === 'title') hay = normalizeSearch(item.title);
+        else hay = normalizeSearch(`${item.title} ${item.artist}`);
+        return terms.every(t => hay.includes(t));
+    }
+    function findMatches(rawQuery, scope) {
+        const terms = normalizeSearch(rawQuery).split(/\s+/).filter(Boolean);
+        if (terms.length === 0) return [];
+        const matches = [];
+        for (const item of itemsMap.values()) {
+            if (itemMatchesScope(item, terms, scope)) matches.push(item);
+        }
+        return matches;
+    }
+    function sortItems(items, sortVal) {
+        if (sortVal === 'id_asc') return items.sort((a, b) => a.id - b.id);
+        if (sortVal === 'title_asc') return items.sort((a, b) => a.title.localeCompare(b.title, 'pl'));
+        if (sortVal === 'artist_asc') return items.sort((a, b) => a.artist.localeCompare(b.artist, 'pl') || b.id - a.id);
+        return items.sort((a, b) => b.id - a.id);
+    }
+    function renderItemRow(item, rawTerms) {
+        return `
+            <div class="search-item">
+                <div class="search-item-main">
+                    <div class="search-item-title">${highlightText(item.title, rawTerms)}</div>
+                    <div class="search-item-artist">${highlightText(item.artist, rawTerms)} · ID ${item.id}</div>
+                </div>
+                <a href="${escapeHtml(`https://toolost.com/release-preview/${toBase64(item.id.toString())}`)}" target="_blank" rel="noopener">Otwórz ↗</a>
+            </div>
+        `;
+    }
 
     const searchInput = document.getElementById('searchInput');
     const searchResultsEl = document.getElementById('searchResults');
+    const searchScopeEl = document.getElementById('searchScope');
+    const searchSortEl = document.getElementById('searchSort');
     let searchDebounceHandle = null;
+    let searchDisplayLimit = 100;
 
     function renderSearchResults() {
         const raw = searchInput.value.trim();
@@ -328,36 +536,199 @@
             searchResultsEl.innerHTML = '';
             return;
         }
-        const terms = normalizeSearch(raw).split(/\s+/).filter(Boolean);
-        const matches = [];
-        for (const item of itemsMap.values()) {
-            const hay = normalizeSearch(`${item.title} ${item.artist}`);
-            if (terms.every(t => hay.includes(t))) matches.push(item);
-        }
-        matches.sort((a, b) => b.id - a.id);
-        const shown = matches.slice(0, 100);
-
+        const matches = sortItems(findMatches(raw, searchScopeEl.value), searchSortEl.value);
         if (matches.length === 0) {
             searchResultsEl.innerHTML = '<div class="search-empty">Brak wyników.</div>';
             return;
         }
-
-        searchResultsEl.innerHTML = shown.map(item => `
-            <div class="search-item">
-                <div class="search-item-main">
-                    <div class="search-item-title">${escapeHtml(item.title)}</div>
-                    <div class="search-item-artist">${escapeHtml(item.artist)} · ID ${item.id}</div>
-                </div>
-                <a href="${escapeHtml(`https://toolost.com/release-preview/${toBase64(item.id.toString())}`)}" target="_blank" rel="noopener">Otwórz ↗</a>
-            </div>
-        `).join('') + (matches.length > shown.length
-            ? `<div class="search-count">Pokazano ${shown.length} z ${matches.length} wyników.</div>`
-            : `<div class="search-count">${matches.length} wynik(ów).</div>`);
+        const shown = matches.slice(0, searchDisplayLimit);
+        const rawTerms = raw.split(/\s+/).filter(Boolean);
+        let html = shown.map(item => renderItemRow(item, rawTerms)).join('');
+        html += (matches.length > shown.length)
+            ? `<button type="button" class="secondary load-more-btn" id="loadMoreBtn">Pokaż więcej (zostało ${(matches.length - shown.length).toLocaleString('pl-PL')})</button>`
+            : `<div class="search-count">${matches.length.toLocaleString('pl-PL')} wynik(ów).</div>`;
+        searchResultsEl.innerHTML = html;
+        const loadMoreBtn = document.getElementById('loadMoreBtn');
+        if (loadMoreBtn) loadMoreBtn.addEventListener('click', () => { searchDisplayLimit += 100; renderSearchResults(); });
     }
 
     searchInput.addEventListener('input', () => {
         clearTimeout(searchDebounceHandle);
+        searchDisplayLimit = 100;
         searchDebounceHandle = setTimeout(renderSearchResults, 150);
+    });
+    searchScopeEl.addEventListener('change', () => { searchDisplayLimit = 100; renderSearchResults(); });
+    searchSortEl.addEventListener('change', () => { searchDisplayLimit = 100; renderSearchResults(); });
+
+    // ============ ZAPISANI ARTYŚCI (ULUBIENI) ============
+    const FAVORITES_KEY = 'toolost_favorite_artists';
+    const favoritesListEl = document.getElementById('favoritesList');
+    const favArtistInput = document.getElementById('favArtistInput');
+    const favSuggestionsEl = document.getElementById('favSuggestions');
+
+    function loadFavorites() {
+        try {
+            const raw = localStorage.getItem(FAVORITES_KEY);
+            favorites = raw ? JSON.parse(raw) : [];
+        } catch { favorites = []; }
+    }
+    function saveFavorites() {
+        try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites)); } catch {}
+    }
+    function isFavorite(name) {
+        const key = normalizeSearch(name);
+        return favorites.some(f => normalizeSearch(f) === key);
+    }
+    function addFavorite(name) {
+        name = (name || '').trim();
+        if (!name || isFavorite(name)) return;
+        favorites.push(name);
+        favorites.sort((a, b) => a.localeCompare(b, 'pl'));
+        saveFavorites();
+        renderFavorites();
+    }
+    function removeFavorite(name) {
+        const key = normalizeSearch(name);
+        favorites = favorites.filter(f => normalizeSearch(f) !== key);
+        saveFavorites();
+        renderFavorites();
+    }
+    function renderFavorites() {
+        if (!favoritesListEl) return;
+        if (favorites.length === 0) {
+            favoritesListEl.innerHTML = '<div class="search-empty">Brak zapisanych artystów. Dodaj powyżej, aby mieć do nich szybki dostęp.</div>';
+            return;
+        }
+        favoritesListEl.innerHTML = favorites.map(name => {
+            const entry = artistCounts.get(normalizeSearch(name));
+            const count = entry ? entry.count : 0;
+            return `
+                <div class="favorite-chip" data-artist="${escapeHtml(name)}" title="Pokaż wydania: ${escapeHtml(name)}">
+                    <span class="favorite-chip-name">${escapeHtml(name)}</span>
+                    <span class="favorite-chip-count">${count}</span>
+                    <button type="button" class="favorite-chip-remove" data-remove="${escapeHtml(name)}" title="Usuń z zapisanych">✕</button>
+                </div>
+            `;
+        }).join('');
+    }
+    favoritesListEl.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('[data-remove]');
+        if (removeBtn) { removeFavorite(removeBtn.getAttribute('data-remove')); return; }
+        const chip = e.target.closest('.favorite-chip');
+        if (chip) {
+            const artist = chip.getAttribute('data-artist');
+            searchInput.value = artist;
+            searchScopeEl.value = 'artist';
+            searchDisplayLimit = 100;
+            renderSearchResults();
+            searchInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    });
+
+    function renderFavSuggestions() {
+        const raw = favArtistInput.value.trim();
+        if (!raw) { favSuggestionsEl.innerHTML = ''; favSuggestionsEl.style.display = 'none'; return; }
+        const key = normalizeSearch(raw);
+        const matches = [];
+        for (const entry of artistCounts.values()) {
+            if (normalizeSearch(entry.display).includes(key)) matches.push(entry);
+        }
+        matches.sort((a, b) => b.count - a.count);
+        const shown = matches.slice(0, 8);
+        if (shown.length === 0) { favSuggestionsEl.innerHTML = ''; favSuggestionsEl.style.display = 'none'; return; }
+        favSuggestionsEl.innerHTML = shown.map(e => `
+            <div class="fav-suggestion-item" data-artist="${escapeHtml(e.display)}">
+                <span>${escapeHtml(e.display)}</span><span class="fav-suggestion-count">${e.count}</span>
+            </div>
+        `).join('');
+        favSuggestionsEl.style.display = 'block';
+    }
+    favArtistInput.addEventListener('input', renderFavSuggestions);
+    favArtistInput.addEventListener('focus', renderFavSuggestions);
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.fav-input-wrap')) favSuggestionsEl.style.display = 'none';
+    });
+    favSuggestionsEl.addEventListener('click', (e) => {
+        const item = e.target.closest('.fav-suggestion-item');
+        if (item) {
+            addFavorite(item.getAttribute('data-artist'));
+            favArtistInput.value = '';
+            favSuggestionsEl.style.display = 'none';
+        }
+    });
+    favArtistInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addFavorite(favArtistInput.value);
+            favArtistInput.value = '';
+            favSuggestionsEl.style.display = 'none';
+        }
+    });
+    document.getElementById('favAddBtn').addEventListener('click', () => {
+        addFavorite(favArtistInput.value);
+        favArtistInput.value = '';
+        favSuggestionsEl.style.display = 'none';
+    });
+
+    // ============ WYSZUKIWANIE ZBIORCZE (WIELE ZAPYTAŃ NARAZ) ============
+    const bulkToggleBtn = document.getElementById('bulkToggleBtn');
+    const bulkPanelEl = document.getElementById('bulkPanel');
+    bulkToggleBtn.addEventListener('click', () => {
+        const hidden = bulkPanelEl.style.display === 'none' || !bulkPanelEl.style.display;
+        bulkPanelEl.style.display = hidden ? 'block' : 'none';
+        bulkToggleBtn.textContent = hidden ? '🔎 Ukryj wyszukiwanie zbiorcze' : '🔎 Wyszukiwanie zbiorcze (wiele naraz)';
+    });
+
+    function runBulkSearch() {
+        const raw = document.getElementById('bulkTextarea').value;
+        const bulkResultsEl = document.getElementById('bulkResults');
+        const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length === 0) {
+            bulkResultsEl.innerHTML = '<div class="search-empty">Wklej listę zapytań (po jednym na linię) i kliknij "Szukaj wszystkich".</div>';
+            return;
+        }
+        const scope = document.getElementById('bulkScope').value;
+        const onlyMissing = document.getElementById('bulkOnlyMissing').checked;
+        const sortVal = searchSortEl.value;
+
+        const seenQueries = new Set();
+        const groups = [];
+        for (const line of lines) {
+            const key = normalizeSearch(line);
+            if (!key || seenQueries.has(key)) continue;
+            seenQueries.add(key);
+            groups.push({ query: line, matches: sortItems(findMatches(line, scope), sortVal) });
+        }
+
+        const totalQueries = groups.length;
+        const missingCount = groups.filter(g => g.matches.length === 0).length;
+        const visibleGroups = onlyMissing ? groups.filter(g => g.matches.length === 0) : groups;
+
+        if (visibleGroups.length === 0) {
+            bulkResultsEl.innerHTML = `<div class="search-empty">Sprawdzono ${totalQueries.toLocaleString('pl-PL')} zapytań — wszystkie mają trafienia.</div>`;
+            return;
+        }
+
+        const PER_GROUP_LIMIT = 8;
+        let html = `<div class="bulk-summary">Sprawdzono ${totalQueries.toLocaleString('pl-PL')} zapytań — ${(totalQueries - missingCount).toLocaleString('pl-PL')} z trafieniami, ${missingCount.toLocaleString('pl-PL')} bez trafień.</div>`;
+        html += visibleGroups.map(g => {
+            const rawTerms = g.query.split(/\s+/).filter(Boolean);
+            if (g.matches.length === 0) {
+                return `<div class="bulk-group"><div class="bulk-group-header bulk-group-header-empty">${escapeHtml(g.query)} — brak wyników</div></div>`;
+            }
+            const shown = g.matches.slice(0, PER_GROUP_LIMIT);
+            const rest = g.matches.length - shown.length;
+            return `<div class="bulk-group">
+                <div class="bulk-group-header">${escapeHtml(g.query)} — ${g.matches.length.toLocaleString('pl-PL')} wynik(ów)</div>
+                ${shown.map(item => renderItemRow(item, rawTerms)).join('')}
+                ${rest > 0 ? `<div class="search-count">+ ${rest.toLocaleString('pl-PL')} więcej — zawęź w zwykłej wyszukiwarce powyżej.</div>` : ''}
+            </div>`;
+        }).join('');
+        bulkResultsEl.innerHTML = html;
+    }
+    document.getElementById('bulkSearchBtn').addEventListener('click', runBulkSearch);
+    document.getElementById('bulkOnlyMissing').addEventListener('change', () => {
+        if (document.getElementById('bulkTextarea').value.trim() !== '') runBulkSearch();
     });
 
     function setButtonsForRunningState() {
