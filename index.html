@@ -249,8 +249,8 @@
 
             <div class="panel alt">
                 <div class="controls-row">
-                    <button id="uploadBtn" class="secondary">⬆️ Wyślij nowe dane na hosting</button>
-                    <button id="exportBtn" class="secondary">💾 Eksportuj JSON (kopia zapasowa)</button>
+                    <button id="uploadBtn" class="secondary">⬆️ Zuploaduj nowe dane</button>
+                    <button id="exportBtn" class="secondary">💾 Eksportuj JSON</button>
                     <button id="importBtn" class="secondary">📥 Importuj JSON</button>
                     <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
                 </div>
@@ -263,17 +263,16 @@
                     <input type="number" id="startIdInput" placeholder="np. 1350000">
                 </div>
                 <div class="controls-row">
-                    <button id="gapFillBtn">⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)</button>
+                    <button id="gapFillBtn">⬇ Skanuj w dół od ID</button>
                     <button id="pauseBtn" disabled>⏸ Pauza</button>
                 </div>
-                <div class="hint-text">Startuje od podanego ID i idzie w dół. Pomija (bez fetchowania) ID, które już masz zapisane — sprawdza tylko to, czego jeszcze nie ma. Dzięki temu wypełnia luki w już zeskanowanym zakresie, a po przejściu przez niego leci dalej w nieznane ID bez zatrzymywania się, dokładnie jak zwykłe „w dół”.</div>
             </div>
 
             <div class="panel alt">
                 <div class="controls-row">
                     <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
                     <input type="text" id="searchInput" placeholder="tytuł, artysta lub ID...">
-                    <button type="button" id="toggleArtistsBtn" class="toggle-mode">🎤 Artyści</button>
+                    <button type="button" id="toggleArtistsBtn" class="toggle-mode">Artyści</button>
                 </div>
                 <div id="searchResults" class="search-results"></div>
             </div>
