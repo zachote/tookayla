@@ -62,8 +62,8 @@
 
     .status-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 14px;
+        grid-template-columns: 1fr;
+        gap: 10px;
     }
     .status-item { text-align: center; }
     .status-item .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -285,7 +285,7 @@
                 </div>
                 <div class="controls-row">
                     <button id="gapFillBtn">⬇ Skanuj w dół od ID</button>
-                    <button id="pauseResumeBtn" class="secondary" disabled>▶ Wznów</button>
+                    <button id="scanToggleBtn" class="secondary" disabled>▶ Wznów</button>
                 </div>
             </div>
 
@@ -293,9 +293,7 @@
                 <div class="controls-row">
                     <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
                     <input type="text" id="searchInput" placeholder="tytuł, artysta lub ID...">
-                </div>
-                <div class="extra-toolbar" id="extraToolbar">
-                    <button type="button" id="clearSearchBtn" class="secondary">✕ Wyczyść</button>
+                    <button type="button" id="toggleArtistsBtn" class="toggle-mode">Artyści</button>
                 </div>
                 <div id="searchResults" class="search-results"></div>
             </div>
@@ -325,7 +323,6 @@
     let lastChunkName = null;
 
     let isRunning = false;
-    let isPaused = false;
     let runningDirection = null; // 'up' | 'down' | null
     let isUploading = false;
     let speedIntervalHandle = null;
@@ -395,11 +392,15 @@
 
     const searchInput = document.getElementById('searchInput');
     const searchResultsEl = document.getElementById('searchResults');
+    const toggleArtistsBtn = document.getElementById('toggleArtistsBtn');
+    const scanToggleBtn = document.getElementById('scanToggleBtn');
     let searchDebounceHandle = null;
 
     function renderItemsList(items, emptyText, footerText) {
         const shown = items.slice(0, 100);
-        if (items.length === 0) return `<div class="search-empty">${emptyText}</div>`;
+        if (items.length === 0) {
+            return `<div class="search-empty">${emptyText}</div>`;
+        }
         return shown.map(item => `
             <div class="search-item">
                 <div class="search-item-main">
@@ -413,7 +414,45 @@
             : `<div class="search-count">${footerText || `${items.length} wynik(ów).`}</div>`);
     }
 
+    // Lista artystów widocznych w zakładce „Artyści”.
+    // Celowo ograniczona wyłącznie do tych pięciu nazw.
+    const IMPORTANT_ARTISTS = [
+        'Ayesha Erotica',
+        'BJ Lips',
+        'shitzulover07',
+        'Cece Natalie',
+        'MISS LUXURY'
+    ];
+
+    function getArtistsList() {
+        const map=new Map();
+        for(const item of itemsMap.values()){const k=normalizeSearch(item.artist); if(!map.has(k)) map.set(k,{display:item.artist,count:0,minId:item.id,maxId:item.id}); const a=map.get(k); a.count++; a.minId=Math.min(a.minId,item.id); a.maxId=Math.max(a.maxId,item.id);}
+        const list=IMPORTANT_ARTISTS.map(display=>{const a=map.get(normalizeSearch(display));return {display,count:a?.count||0,minId:a?.minId??null,maxId:a?.maxId??null};});
+        list.sort((a,b)=>a.display.localeCompare(b.display,'pl'));
+        return list;
+    }
+
+    function renderArtistsList() {
+        const artists=getArtistsList();
+        searchResultsEl.innerHTML=artists.map(a=>`<div class="artist-card" data-artist="${escapeHtml(a.display)}"><div class="artist-card-top"><span class="artist-card-name">${escapeHtml(a.display)}</span><b>${a.count}</b></div><div class="artist-card-meta">${a.count?`ID ${a.minId.toLocaleString('pl-PL')} → ${a.maxId.toLocaleString('pl-PL')}`:'Brak zapisanych wydań'}</div></div>`).join('')+'<div class="search-count">Dokładnie 5 artystów.</div>';
+    }
+
+    function renderArtistDetail(artistName) {
+        const key = normalizeSearch(artistName);
+        const matches = Array.from(itemsMap.values()).filter(item => normalizeSearch(item.artist) === key);
+        matches.sort((a, b) => b.id - a.id);
+        const header = `
+            <div class="artist-detail-header">
+                <div class="artist-detail-title">${escapeHtml(artistName)}</div>
+                <button type="button" class="artist-back">← Wszyscy artyści</button>
+            </div>`;
+        searchResultsEl.innerHTML = header + renderItemsList(matches, 'Brak wydań tego artysty.', `${matches.length} wydań artysty „${artistName}”.`);
+    }
+
     function renderSearchResults() {
+        if (browseMode === 'artists') { renderArtistsList(); return; }
+        if (browseMode === 'artist-detail') { renderArtistDetail(selectedArtist); return; }
+
         const raw = searchInput.value.trim();
         if (raw === '') {
             searchResultsEl.innerHTML = '';
@@ -421,23 +460,50 @@
         }
 
         const terms = normalizeSearch(raw).split(/\s+/).filter(Boolean);
-        const matches = Array.from(itemsMap.values()).filter(item => {
-            const hay = normalizeSearch(`${item.title} ${item.artist} ${item.id}`);
-            return terms.every(term => hay.includes(term));
-        });
-
+        const idQuery = /^\d+$/.test(raw) ? raw : null;
+        const matches = [];
+        for (const item of itemsMap.values()) {
+            if (idQuery !== null && item.id.toString().includes(idQuery)) {
+                matches.push(item);
+                continue;
+            }
+            const hay = normalizeSearch(`${item.title} ${item.artist}`);
+            if (terms.every(t => hay.includes(t))) matches.push(item);
+        }
         matches.sort((a, b) => b.id - a.id);
-        searchResultsEl.innerHTML = renderItemsList(matches, 'Brak wyników.');
+        searchResultsEl.innerHTML = renderItemsList(matches, 'Brak wyników.', `${matches.length} wynik(ów).`);
     }
 
+    function setBrowseMode(mode, artist) {
+        browseMode = mode;
+        selectedArtist = artist || null;
+        toggleArtistsBtn.classList.toggle('active', browseMode !== 'search');
+        toggleArtistsBtn.textContent = browseMode === 'search' ? 'Artyści' : 'Wydania';
+        renderSearchResults();
+    }
+
+
     searchInput.addEventListener('input', () => {
+        if (browseMode !== 'search') {
+            setBrowseMode('search');
+        }
         clearTimeout(searchDebounceHandle);
         searchDebounceHandle = setTimeout(renderSearchResults, 150);
     });
 
-    document.getElementById('clearSearchBtn').addEventListener('click', () => {
-        searchInput.value = '';
-        renderSearchResults();
+    toggleArtistsBtn.addEventListener('click', () => {
+        if (browseMode === 'search') {
+            setBrowseMode('artists');
+        } else {
+            setBrowseMode('search');
+        }
+    });
+
+    searchResultsEl.addEventListener('click', (e) => {
+        const card = e.target.closest('.artist-card');
+        if (card) { setBrowseMode('artist-detail', card.dataset.artist); return; }
+        const back = e.target.closest('.artist-back');
+        if (back) { setBrowseMode('artists'); }
     });
 
     let session={checked:0,found:0,miss:0,errors:0,lastId:null};
@@ -448,15 +514,15 @@
 
     function setButtonsForRunningState() {
         const gapFillBtn = document.getElementById('gapFillBtn');
-        const pauseResumeBtn = document.getElementById('pauseResumeBtn');
+        gapFillBtn.classList.toggle('running', isRunning && runningDirection === 'gapfill');
+        gapFillBtn.textContent = isRunning && runningDirection === 'gapfill'
+            ? '⏹ Zatrzymaj (uzupełnianie luk)'
+            : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
+        gapFillBtn.disabled = isRunning && runningDirection !== 'gapfill';
 
-        gapFillBtn.classList.toggle('running', isRunning && !isPaused);
-        gapFillBtn.textContent = isRunning ? '⏹ Zatrzymaj skan' : '⬇ Skanuj w dół od ID';
-        gapFillBtn.disabled = isRunning;
-
-        pauseResumeBtn.disabled = !isRunning;
-        pauseResumeBtn.textContent = isPaused ? '▶ Wznów' : '⏸ Pauza';
-        pauseResumeBtn.classList.toggle('paused', isPaused);
+        scanToggleBtn.disabled = !isRunning && !lastScan.nextId;
+        scanToggleBtn.classList.toggle('paused', !isRunning && !!lastScan.nextId);
+        scanToggleBtn.textContent = isRunning ? '⏸ Pauza' : '▶ Wznów';
     }
 
     // ============ WCZYTYWANIE Z GIST (z automatycznym ponawianiem aż do skutku) ============
@@ -763,8 +829,6 @@
 
         async function worker() {
             while (isRunning) {
-                while (isRunning && isPaused) await sleep(100);
-                if (!isRunning) break;
                 const id = claimNextId();
                 if (id !== null) lastScan={nextId:id-1,endId:document.getElementById('endIdInput').value.trim()?Number(document.getElementById('endIdInput').value):null};
                 if (id === null) {
@@ -826,7 +890,6 @@
         clearInterval(speedIntervalHandle);
         speedEl.textContent = '–';
         runningDirection = null;
-        isPaused = false;
         setButtonsForRunningState();
         log(`Uzupełnianie luk zatrzymane. Łącznie pominięto ${skippedTotal.toLocaleString('pl-PL')} już zapisanych ID.`, 'info');
     }
@@ -850,18 +913,26 @@
         }
 
         isRunning = true;
-        isPaused = false;
         runningDirection = 'gapfill';
         setButtonsForRunningState();
         scanDownFillGaps(startId);
     }
 
     document.getElementById('gapFillBtn').addEventListener('click', handleGapFillClick);
-    document.getElementById('pauseResumeBtn').addEventListener('click', () => {
-        if (!isRunning) return;
-        isPaused = !isPaused;
-        log(isPaused ? 'Skanowanie wstrzymane.' : 'Skanowanie wznowione.', 'info');
-        setButtonsForRunningState();
+    scanToggleBtn.addEventListener('click', () => {
+        if (isRunning) {
+            isRunning = false;
+            setButtonsForRunningState();
+            log('Pauzowanie skanu (po zakończeniu bieżących żądań)...', 'info');
+            return;
+        }
+        if (!lastScan.nextId) {
+            log('Brak skanu do wznowienia.', 'error');
+            return;
+        }
+        document.getElementById('startIdInput').value = lastScan.nextId;
+        document.getElementById('endIdInput').value = lastScan.endId ?? '';
+        handleGapFillClick();
     });
 
     // ============ START APLIKACJI ============
