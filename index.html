@@ -285,7 +285,7 @@
                 </div>
                 <div class="controls-row">
                     <button id="gapFillBtn">⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)</button>
-                    <button id="pauseBtn" disabled>⏸ Pauza</button><button id="resumeBtn" class="secondary">▶ Wznów</button>
+                    <button id="pauseResumeBtn" class="secondary" disabled>▶ Wznów</button>
                 </div>
                 <div class="hint-text">Startuje od podanego ID i idzie w dół. Pomija (bez fetchowania) ID, które już masz zapisane — sprawdza tylko to, czego jeszcze nie ma. Dzięki temu wypełnia luki w już zeskanowanym zakresie, a po przejściu przez niego leci dalej w nieznane ID bez zatrzymywania się, dokładnie jak zwykłe „w dół”.</div>
             </div>
@@ -294,16 +294,9 @@
                 <div class="controls-row">
                     <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
                     <input type="text" id="searchInput" placeholder="tytuł, artysta lub ID...">
-                    <button type="button" id="toggleArtistsBtn" class="toggle-mode">🎤 Artyści</button>
-                    <select id="artistSortSelect" class="artist-sort-select" aria-label="Sortowanie artystów">
-                        <option value="name-asc">Nazwa A–Z</option><option value="name-desc">Nazwa Z–A</option><option value="id-newest">Najnowsze ID</option><option value="id-oldest">Najstarsze ID</option><option value="count-desc">Najwięcej wydań</option><option value="count-asc">Najmniej wydań</option>
-                    </select>
                 </div>
                 <div class="extra-toolbar" id="extraToolbar" style="display:none">
                     <button type="button" id="clearSearchBtn" class="secondary">✕ Wyczyść</button>
-                    <button type="button" id="exportArtistBtn" class="secondary">💾 Eksportuj artystę</button>
-                    <button type="button" id="exportRangeBtn" class="secondary">💾 Eksportuj zakres</button>
-                    <button type="button" id="gapsBtn" class="secondary">🔎 Pokaż luki ID</button>
                 </div>
                 <div id="searchResults" class="search-results"></div>
             </div>
@@ -333,6 +326,7 @@
     let lastChunkName = null;
 
     let isRunning = false;
+    let isPaused = false;
     let runningDirection = null; // 'up' | 'down' | null
     let isUploading = false;
     let speedIntervalHandle = null;
@@ -402,15 +396,11 @@
 
     const searchInput = document.getElementById('searchInput');
     const searchResultsEl = document.getElementById('searchResults');
-    const toggleArtistsBtn = document.getElementById('toggleArtistsBtn');
-    const artistSortSelect = document.getElementById('artistSortSelect');
     let searchDebounceHandle = null;
 
     function renderItemsList(items, emptyText, footerText) {
         const shown = items.slice(0, 100);
-        if (items.length === 0) {
-            return `<div class="search-empty">${emptyText}</div>`;
-        }
+        if (items.length === 0) return `<div class="search-empty">${emptyText}</div>`;
         return shown.map(item => `
             <div class="search-item">
                 <div class="search-item-main">
@@ -424,119 +414,52 @@
             : `<div class="search-count">${footerText || `${items.length} wynik(ów).`}</div>`);
     }
 
-    // Lista artystów widocznych w zakładce „Artyści”.
-    // Celowo ograniczona wyłącznie do tych pięciu nazw.
-    const IMPORTANT_ARTISTS = [
-        'Ayesha Erotica',
-        'BJ Lips',
-        'shitzulover07',
-        'Cece Natalie',
-        'MISS LUXURY'
-    ];
-
-    function getArtistsList() {
-        const map=new Map();
-        for(const item of itemsMap.values()){const k=normalizeSearch(item.artist); if(!map.has(k)) map.set(k,{display:item.artist,count:0,minId:item.id,maxId:item.id}); const a=map.get(k); a.count++; a.minId=Math.min(a.minId,item.id); a.maxId=Math.max(a.maxId,item.id);}
-        const list=IMPORTANT_ARTISTS.map(display=>{const a=map.get(normalizeSearch(display));return {display,count:a?.count||0,minId:a?.minId??null,maxId:a?.maxId??null};});
-        const mode=document.getElementById('artistSortSelect')?.value||'name-asc';
-        list.sort((a,b)=>mode==='name-desc'?b.display.localeCompare(a.display,'pl'):mode==='id-newest'?(b.maxId??-1)-(a.maxId??-1):mode==='id-oldest'?(a.minId??Infinity)-(b.minId??Infinity):mode==='count-desc'?b.count-a.count||a.display.localeCompare(b.display,'pl'):mode==='count-asc'?a.count-b.count||a.display.localeCompare(b.display,'pl'):a.display.localeCompare(b.display,'pl'));
-        return list;
-    }
-
-    function renderArtistsList() {
-        document.getElementById('extraToolbar').style.display='flex';
-        const artists=getArtistsList();
-        searchResultsEl.innerHTML=artists.map(a=>`<div class="artist-card" data-artist="${escapeHtml(a.display)}"><div class="artist-card-top"><span class="artist-card-name">🎤 ${escapeHtml(a.display)}</span><b>${a.count}</b></div><div class="artist-card-meta">${a.count?`ID ${a.minId.toLocaleString('pl-PL')} → ${a.maxId.toLocaleString('pl-PL')}`:'Brak zapisanych wydań'}</div></div>`).join('')+'<div class="search-count">Dokładnie 5 artystów.</div>';
-    }
-
-    function renderArtistDetail(artistName) {
-        const key = normalizeSearch(artistName);
-        const matches = Array.from(itemsMap.values()).filter(item => normalizeSearch(item.artist) === key);
-        matches.sort((a, b) => b.id - a.id);
-        const header = `
-            <div class="artist-detail-header">
-                <div class="artist-detail-title">${escapeHtml(artistName)}</div>
-                <button type="button" class="artist-back">← Wszyscy artyści</button>
-            </div>`;
-        searchResultsEl.innerHTML = header + renderItemsList(matches, 'Brak wydań tego artysty.', `${matches.length} wydań artysty „${artistName}”.`);
-    }
-
     function renderSearchResults() {
-        if (browseMode === 'artists') { renderArtistsList(); return; }
-        if (browseMode === 'artist-detail') { renderArtistDetail(selectedArtist); return; }
-
         const raw = searchInput.value.trim();
         if (raw === '') {
             searchResultsEl.innerHTML = '';
             return;
         }
+
         const terms = normalizeSearch(raw).split(/\s+/).filter(Boolean);
-        const idQuery = /^\d+$/.test(raw) ? raw : null;
-        const matches = [];
-        for (const item of itemsMap.values()) {
-            if (idQuery !== null && item.id.toString().includes(idQuery)) { matches.push(item); continue; }
-            const hay = normalizeSearch(`${item.title} ${item.artist}`);
-            if (terms.every(t => hay.includes(t))) matches.push(item);
-        }
+        const matches = Array.from(itemsMap.values()).filter(item => {
+            const hay = normalizeSearch(`${item.title} ${item.artist} ${item.id}`);
+            return terms.every(term => hay.includes(term));
+        });
+
         matches.sort((a, b) => b.id - a.id);
         searchResultsEl.innerHTML = renderItemsList(matches, 'Brak wyników.');
     }
 
-    function setBrowseMode(mode, artist) {
-        browseMode = mode;
-        selectedArtist = artist || null;
-        toggleArtistsBtn.classList.toggle('active', browseMode !== 'search');
-        toggleArtistsBtn.textContent = browseMode === 'search' ? '🎤 Artyści' : '🔎 Szukaj';
-        document.getElementById('extraToolbar').style.display = browseMode === 'search' ? 'none' : 'flex';
-        renderSearchResults();
-    }
-
     searchInput.addEventListener('input', () => {
-        if (browseMode !== 'search') setBrowseMode('search');
         clearTimeout(searchDebounceHandle);
         searchDebounceHandle = setTimeout(renderSearchResults, 150);
     });
 
-    artistSortSelect.addEventListener('change', () => {
-        if (browseMode === 'artists') renderArtistsList();
-    });
-
-    toggleArtistsBtn.addEventListener('click', () => {
-        if (browseMode === 'search') {
-            searchInput.value = '';
-            setBrowseMode('artists');
-        } else {
-            setBrowseMode('search');
-        }
-    });
-
-    searchResultsEl.addEventListener('click', (e) => {
-        const card = e.target.closest('.artist-card');
-        if (card) { setBrowseMode('artist-detail', card.dataset.artist); return; }
-        const back = e.target.closest('.artist-back');
-        if (back) { setBrowseMode('artists'); }
+    document.getElementById('clearSearchBtn').addEventListener('click', () => {
+        searchInput.value = '';
+        renderSearchResults();
     });
 
     let session={checked:0,found:0,miss:0,errors:0,lastId:null};
     let lastScan={nextId:null,endId:null};
     function updateSessionUI(){for(const [id,val] of [['sessionFound',session.found],['sessionMiss',session.miss],['sessionErrors',session.errors],['sessionChecked',session.checked]]) document.getElementById(id).textContent=val.toLocaleString('pl-PL');document.getElementById('lastChecked').textContent=session.lastId==null?'–':session.lastId.toLocaleString('pl-PL');}
     function exportItems(items,name){const blob=new Blob([JSON.stringify(items.sort((a,b)=>a.id-b.id),null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
-    function exportArtist(){if(!selectedArtist){setSaveStatus('Otwórz najpierw artystę.');return;}const k=normalizeSearch(selectedArtist);exportItems(Array.from(itemsMap.values()).filter(i=>normalizeSearch(i.artist)===k),`toolost_${selectedArtist.replace(/[^a-z0-9]+/gi,'_')}.json`);}
-    function exportRange(){const a=Number(document.getElementById('startIdInput').value),b=Number(document.getElementById('endIdInput').value);if(!Number.isFinite(a)||!Number.isFinite(b)){setSaveStatus('Podaj oba ID zakresu.');return;}const lo=Math.min(a,b),hi=Math.max(a,b);exportItems(Array.from(itemsMap.values()).filter(i=>i.id>=lo&&i.id<=hi),`toolost_range_${lo}_${hi}.json`);}
-    function showGaps(){const ids=Array.from(itemsMap.keys()).sort((a,b)=>a-b),g=[];for(let i=1;i<ids.length;i++)if(ids[i]>ids[i-1]+1)g.push([ids[i-1]+1,ids[i]-1]);searchResultsEl.innerHTML=g.length?g.map(x=>`<div class="search-item"><div class="search-item-main"><div class="search-item-title">Luka ${x[0].toLocaleString('pl-PL')} – ${x[1].toLocaleString('pl-PL')}</div><div class="search-item-artist">${(x[1]-x[0]+1).toLocaleString('pl-PL')} ID</div></div></div>`).join(''):'<div class="search-empty">Brak luk.</div>';}
-    document.getElementById('artistSortSelect').addEventListener('change',renderArtistsList);
     document.getElementById('clearSearchBtn').addEventListener('click',()=>{searchInput.value='';setBrowseMode('search');});
-    document.getElementById('exportArtistBtn').addEventListener('click',exportArtist);
     document.getElementById('exportRangeBtn').addEventListener('click',exportRange);
-    document.getElementById('gapsBtn').addEventListener('click',showGaps);
     document.getElementById('workerInput').addEventListener('change',e=>{e.target.value=Math.max(1,Math.min(64,Number(e.target.value)||16));});
 
     function setButtonsForRunningState() {
         const gapFillBtn = document.getElementById('gapFillBtn');
-        gapFillBtn.classList.toggle('running', runningDirection === 'gapfill');
-        gapFillBtn.textContent = runningDirection === 'gapfill' ? '⏹ Zatrzymaj (uzupełnianie luk)' : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
-        const otherRunning = isRunning && runningDirection !== null;
-        gapFillBtn.disabled = otherRunning && runningDirection !== 'gapfill';
+        const pauseResumeBtn = document.getElementById('pauseResumeBtn');
+
+        gapFillBtn.classList.toggle('running', isRunning && !isPaused);
+        gapFillBtn.textContent = isRunning ? '⏹ Zatrzymaj skan' : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
+        gapFillBtn.disabled = isRunning;
+
+        pauseResumeBtn.disabled = !isRunning;
+        pauseResumeBtn.textContent = isPaused ? '▶ Wznów' : '⏸ Pauza';
+        pauseResumeBtn.classList.toggle('paused', isPaused);
     }
 
     // ============ WCZYTYWANIE Z GIST (z automatycznym ponawianiem aż do skutku) ============
@@ -843,6 +766,8 @@
 
         async function worker() {
             while (isRunning) {
+                while (isRunning && isPaused) await sleep(100);
+                if (!isRunning) break;
                 const id = claimNextId();
                 if (id !== null) lastScan={nextId:id-1,endId:document.getElementById('endIdInput').value.trim()?Number(document.getElementById('endIdInput').value):null};
                 if (id === null) {
@@ -904,6 +829,7 @@
         clearInterval(speedIntervalHandle);
         speedEl.textContent = '–';
         runningDirection = null;
+        isPaused = false;
         setButtonsForRunningState();
         log(`Uzupełnianie luk zatrzymane. Łącznie pominięto ${skippedTotal.toLocaleString('pl-PL')} już zapisanych ID.`, 'info');
     }
@@ -927,13 +853,19 @@
         }
 
         isRunning = true;
+        isPaused = false;
         runningDirection = 'gapfill';
         setButtonsForRunningState();
         scanDownFillGaps(startId);
     }
 
     document.getElementById('gapFillBtn').addEventListener('click', handleGapFillClick);
-    document.getElementById('resumeBtn').addEventListener('click',()=>{if(!lastScan.nextId){log('Brak skanu do wznowienia.','error');return;}document.getElementById('startIdInput').value=lastScan.nextId;document.getElementById('endIdInput').value=lastScan.endId??'';handleGapFillClick();});
+    document.getElementById('pauseResumeBtn').addEventListener('click', () => {
+        if (!isRunning) return;
+        isPaused = !isPaused;
+        log(isPaused ? 'Skanowanie wstrzymane.' : 'Skanowanie wznowione.', 'info');
+        setButtonsForRunningState();
+    });
 
     // ============ START APLIKACJI ============
     async function init() {
