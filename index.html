@@ -182,6 +182,16 @@
     }
     .artist-chip:hover { background: #e4e2f4; }
     .artist-chip-name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .artist-sort-select {
+        padding: 10px 12px;
+        font-size: 13px;
+        border-radius: 8px;
+        border: none;
+        background: var(--panel-bg-alt);
+        color: var(--text);
+        cursor: pointer;
+    }
+    .artist-sort-select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
     .artist-chip-count {
         font-size: 11.5px;
         color: var(--muted);
@@ -208,6 +218,11 @@
         padding: 4px 6px;
     }
     .artist-back:hover { text-decoration: underline; }
+
+    .extra-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.extra-toolbar select,.extra-toolbar input{padding:9px 10px;border:0;border-radius:8px;background:var(--panel-bg);color:var(--text)}
+    .mini-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:12px}.mini-stat{background:var(--panel-bg-alt);padding:10px;border-radius:10px;text-align:center}.mini-stat b{display:block;font-size:16px}.mini-stat span{font-size:10px;color:var(--muted);text-transform:uppercase}
+    .progress{height:8px;background:var(--panel-bg-alt);border-radius:99px;overflow:hidden;margin-top:12px}.progress>div{height:100%;width:0;background:var(--accent);transition:width .2s}.scan-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:5px}
+    .artist-card{padding:12px;border-radius:10px;background:var(--panel-bg-alt);margin-bottom:7px;cursor:pointer}.artist-card:hover{background:#e4e2f4}.artist-card-top{display:flex;justify-content:space-between}.artist-card-name{font-weight:700}.artist-card-meta{font-size:11px;color:var(--muted);margin-top:5px}
 </style>
 </head>
 <body>
@@ -245,12 +260,16 @@
                         <div class="value" id="statRateLimit">–</div>
                     </div>
                 </div>
+                <div class="mini-stats">
+                    <div class="mini-stat"><b id="statArtists">5</b><span>artystów</span></div><div class="mini-stat"><b id="sessionFound">0</b><span>znaleziono</span></div><div class="mini-stat"><b id="sessionMiss">0</b><span>404</span></div><div class="mini-stat"><b id="sessionErrors">0</b><span>błędy</span></div><div class="mini-stat"><b id="sessionChecked">0</b><span>sprawdzono</span></div><div class="mini-stat"><b id="lastChecked">–</b><span>ostatnie ID</span></div>
+                </div>
+                <div class="progress"><div id="scanProgress"></div></div><div class="scan-meta"><span id="progressText">Brak aktywnego skanu</span><span id="etaText">–</span></div>
             </div>
 
             <div class="panel alt">
                 <div class="controls-row">
-                    <button id="uploadBtn" class="secondary">⬆️ Zuploaduj nowe dane</button>
-                    <button id="exportBtn" class="secondary">💾 Eksportuj JSON</button>
+                    <button id="uploadBtn" class="secondary">⬆️ Wyślij nowe dane na hosting</button>
+                    <button id="exportBtn" class="secondary">💾 Eksportuj JSON (kopia zapasowa)</button>
                     <button id="importBtn" class="secondary">📥 Importuj JSON</button>
                     <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
                 </div>
@@ -261,18 +280,30 @@
                 <div class="controls-row">
                     <label class="field-label" for="startIdInput">ID startowe:</label>
                     <input type="number" id="startIdInput" placeholder="np. 1350000">
+                    <label class="field-label" for="endIdInput">ID końcowe:</label><input type="number" id="endIdInput" placeholder="opcjonalnie">
+                    <label class="field-label" for="workerInput">Workerów:</label><input type="number" id="workerInput" min="1" max="64" value="16">
                 </div>
                 <div class="controls-row">
-                    <button id="gapFillBtn">⬇ Skanuj w dół od ID</button>
-                    <button id="pauseBtn" disabled>⏸ Pauza</button>
+                    <button id="gapFillBtn">⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)</button>
+                    <button id="pauseBtn" disabled>⏸ Pauza</button><button id="resumeBtn" class="secondary">▶ Wznów</button>
                 </div>
+                <div class="hint-text">Startuje od podanego ID i idzie w dół. Pomija (bez fetchowania) ID, które już masz zapisane — sprawdza tylko to, czego jeszcze nie ma. Dzięki temu wypełnia luki w już zeskanowanym zakresie, a po przejściu przez niego leci dalej w nieznane ID bez zatrzymywania się, dokładnie jak zwykłe „w dół”.</div>
             </div>
 
             <div class="panel alt">
                 <div class="controls-row">
                     <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
                     <input type="text" id="searchInput" placeholder="tytuł, artysta lub ID...">
-                    <button type="button" id="toggleArtistsBtn" class="toggle-mode">Artyści</button>
+                    <button type="button" id="toggleArtistsBtn" class="toggle-mode">🎤 Artyści</button>
+                    <select id="artistSortSelect" class="artist-sort-select" aria-label="Sortowanie artystów">
+                        <option value="name-asc">Nazwa A–Z</option><option value="name-desc">Nazwa Z–A</option><option value="id-newest">Najnowsze ID</option><option value="id-oldest">Najstarsze ID</option><option value="count-desc">Najwięcej wydań</option><option value="count-asc">Najmniej wydań</option>
+                    </select>
+                </div>
+                <div class="extra-toolbar" id="extraToolbar" style="display:none">
+                    <button type="button" id="clearSearchBtn" class="secondary">✕ Wyczyść</button>
+                    <button type="button" id="exportArtistBtn" class="secondary">💾 Eksportuj artystę</button>
+                    <button type="button" id="exportRangeBtn" class="secondary">💾 Eksportuj zakres</button>
+                    <button type="button" id="gapsBtn" class="secondary">🔎 Pokaż luki ID</button>
                 </div>
                 <div id="searchResults" class="search-results"></div>
             </div>
@@ -372,6 +403,7 @@
     const searchInput = document.getElementById('searchInput');
     const searchResultsEl = document.getElementById('searchResults');
     const toggleArtistsBtn = document.getElementById('toggleArtistsBtn');
+    const artistSortSelect = document.getElementById('artistSortSelect');
     let searchDebounceHandle = null;
 
     function renderItemsList(items, emptyText, footerText) {
@@ -403,31 +435,18 @@
     ];
 
     function getArtistsList() {
-        const counts = new Map();
-        for (const item of itemsMap.values()) {
-            const key = normalizeSearch(item.artist);
-            counts.set(key, (counts.get(key) || 0) + 1);
-        }
-
-        // Zachowujemy dokładnie kolejność i pisownię z IMPORTANT_ARTISTS.
-        return IMPORTANT_ARTISTS.map(display => ({
-            display,
-            count: counts.get(normalizeSearch(display)) || 0
-        }));
+        const map=new Map();
+        for(const item of itemsMap.values()){const k=normalizeSearch(item.artist); if(!map.has(k)) map.set(k,{display:item.artist,count:0,minId:item.id,maxId:item.id}); const a=map.get(k); a.count++; a.minId=Math.min(a.minId,item.id); a.maxId=Math.max(a.maxId,item.id);}
+        const list=IMPORTANT_ARTISTS.map(display=>{const a=map.get(normalizeSearch(display));return {display,count:a?.count||0,minId:a?.minId??null,maxId:a?.maxId??null};});
+        const mode=document.getElementById('artistSortSelect')?.value||'name-asc';
+        list.sort((a,b)=>mode==='name-desc'?b.display.localeCompare(a.display,'pl'):mode==='id-newest'?(b.maxId??-1)-(a.maxId??-1):mode==='id-oldest'?(a.minId??Infinity)-(b.minId??Infinity):mode==='count-desc'?b.count-a.count||a.display.localeCompare(b.display,'pl'):mode==='count-asc'?a.count-b.count||a.display.localeCompare(b.display,'pl'):a.display.localeCompare(b.display,'pl'));
+        return list;
     }
 
     function renderArtistsList() {
-        const artists = getArtistsList();
-        if (artists.length === 0) {
-            searchResultsEl.innerHTML = '<div class="search-empty">Brak zapisanych artystów — wczytaj lub zeskanuj wydania.</div>';
-            return;
-        }
-        searchResultsEl.innerHTML = artists.map(a => `
-            <button type="button" class="artist-chip" data-artist="${escapeHtml(a.display)}">
-                <span class="artist-chip-name">${escapeHtml(a.display)}</span>
-                <span class="artist-chip-count">${a.count}</span>
-            </button>
-        `).join('') + `<div class="search-count">${artists.length} artyst(ów).</div>`;
+        document.getElementById('extraToolbar').style.display='flex';
+        const artists=getArtistsList();
+        searchResultsEl.innerHTML=artists.map(a=>`<div class="artist-card" data-artist="${escapeHtml(a.display)}"><div class="artist-card-top"><span class="artist-card-name">🎤 ${escapeHtml(a.display)}</span><b>${a.count}</b></div><div class="artist-card-meta">${a.count?`ID ${a.minId.toLocaleString('pl-PL')} → ${a.maxId.toLocaleString('pl-PL')}`:'Brak zapisanych wydań'}</div></div>`).join('')+'<div class="search-count">Dokładnie 5 artystów.</div>';
     }
 
     function renderArtistDetail(artistName) {
@@ -467,7 +486,8 @@
         browseMode = mode;
         selectedArtist = artist || null;
         toggleArtistsBtn.classList.toggle('active', browseMode !== 'search');
-        toggleArtistsBtn.textContent = browseMode === 'search' ? 'Artyści' : 'Szukaj';
+        toggleArtistsBtn.textContent = browseMode === 'search' ? '🎤 Artyści' : '🔎 Szukaj';
+        document.getElementById('extraToolbar').style.display = browseMode === 'search' ? 'none' : 'flex';
         renderSearchResults();
     }
 
@@ -475,6 +495,10 @@
         if (browseMode !== 'search') setBrowseMode('search');
         clearTimeout(searchDebounceHandle);
         searchDebounceHandle = setTimeout(renderSearchResults, 150);
+    });
+
+    artistSortSelect.addEventListener('change', () => {
+        if (browseMode === 'artists') renderArtistsList();
     });
 
     toggleArtistsBtn.addEventListener('click', () => {
@@ -487,16 +511,30 @@
     });
 
     searchResultsEl.addEventListener('click', (e) => {
-        const chip = e.target.closest('.artist-chip');
-        if (chip) { setBrowseMode('artist-detail', chip.dataset.artist); return; }
+        const card = e.target.closest('.artist-card');
+        if (card) { setBrowseMode('artist-detail', card.dataset.artist); return; }
         const back = e.target.closest('.artist-back');
         if (back) { setBrowseMode('artists'); }
     });
 
+    let session={checked:0,found:0,miss:0,errors:0,lastId:null};
+    let lastScan={nextId:null,endId:null};
+    function updateSessionUI(){for(const [id,val] of [['sessionFound',session.found],['sessionMiss',session.miss],['sessionErrors',session.errors],['sessionChecked',session.checked]]) document.getElementById(id).textContent=val.toLocaleString('pl-PL');document.getElementById('lastChecked').textContent=session.lastId==null?'–':session.lastId.toLocaleString('pl-PL');}
+    function exportItems(items,name){const blob=new Blob([JSON.stringify(items.sort((a,b)=>a.id-b.id),null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
+    function exportArtist(){if(!selectedArtist){setSaveStatus('Otwórz najpierw artystę.');return;}const k=normalizeSearch(selectedArtist);exportItems(Array.from(itemsMap.values()).filter(i=>normalizeSearch(i.artist)===k),`toolost_${selectedArtist.replace(/[^a-z0-9]+/gi,'_')}.json`);}
+    function exportRange(){const a=Number(document.getElementById('startIdInput').value),b=Number(document.getElementById('endIdInput').value);if(!Number.isFinite(a)||!Number.isFinite(b)){setSaveStatus('Podaj oba ID zakresu.');return;}const lo=Math.min(a,b),hi=Math.max(a,b);exportItems(Array.from(itemsMap.values()).filter(i=>i.id>=lo&&i.id<=hi),`toolost_range_${lo}_${hi}.json`);}
+    function showGaps(){const ids=Array.from(itemsMap.keys()).sort((a,b)=>a-b),g=[];for(let i=1;i<ids.length;i++)if(ids[i]>ids[i-1]+1)g.push([ids[i-1]+1,ids[i]-1]);searchResultsEl.innerHTML=g.length?g.map(x=>`<div class="search-item"><div class="search-item-main"><div class="search-item-title">Luka ${x[0].toLocaleString('pl-PL')} – ${x[1].toLocaleString('pl-PL')}</div><div class="search-item-artist">${(x[1]-x[0]+1).toLocaleString('pl-PL')} ID</div></div></div>`).join(''):'<div class="search-empty">Brak luk.</div>';}
+    document.getElementById('artistSortSelect').addEventListener('change',renderArtistsList);
+    document.getElementById('clearSearchBtn').addEventListener('click',()=>{searchInput.value='';setBrowseMode('search');});
+    document.getElementById('exportArtistBtn').addEventListener('click',exportArtist);
+    document.getElementById('exportRangeBtn').addEventListener('click',exportRange);
+    document.getElementById('gapsBtn').addEventListener('click',showGaps);
+    document.getElementById('workerInput').addEventListener('change',e=>{e.target.value=Math.max(1,Math.min(64,Number(e.target.value)||16));});
+
     function setButtonsForRunningState() {
         const gapFillBtn = document.getElementById('gapFillBtn');
         gapFillBtn.classList.toggle('running', runningDirection === 'gapfill');
-        gapFillBtn.textContent = runningDirection === 'gapfill' ? '⏹ Zatrzymaj (uzupełnianie luk)' : '⬇ Skanuj w dół od ID';
+        gapFillBtn.textContent = runningDirection === 'gapfill' ? '⏹ Zatrzymaj (uzupełnianie luk)' : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
         const otherRunning = isRunning && runningDirection !== null;
         gapFillBtn.disabled = otherRunning && runningDirection !== 'gapfill';
     }
@@ -780,6 +818,7 @@
         function claimNextId() {
             let skipStart = null, skipEnd = null;
             while (true) {
+                if (document.getElementById('endIdInput').value.trim() && nextIdToAssign < Number(document.getElementById('endIdInput').value)) return null;
                 if (nextIdToAssign < 1) {
                     if (skipStart !== null) {
                         skippedTotal += (skipStart - skipEnd + 1);
@@ -805,6 +844,7 @@
         async function worker() {
             while (isRunning) {
                 const id = claimNextId();
+                if (id !== null) lastScan={nextId:id-1,endId:document.getElementById('endIdInput').value.trim()?Number(document.getElementById('endIdInput').value):null};
                 if (id === null) {
                     if (!boundaryLogged) {
                         boundaryLogged = true;
@@ -815,9 +855,10 @@
                 }
 
                 const res = await fetchOne(id);
-                checkedSinceTick++;
+                checkedSinceTick++; session.checked++; session.lastId=id; updateSessionUI();
 
                 if (res.status === 'found') {
+                    session.found++; updateSessionUI();
                     const item = { id: res.id, title: res.title, artist: res.artist };
                     const isNew = addItemToMemory(item);
                     if (isNew) pendingNewItems.push(item);
@@ -827,7 +868,7 @@
                     log(`✔ ID ${res.id} — "${res.title}" — ${res.artist}`, 'found');
                     updateStatusBar();
                 } else if (res.status === 'notfound') {
-                    missStreak++;
+                    session.miss++; missStreak++; updateSessionUI();
                     errorStreak = 0;
                     log(`— ID ${res.id}: brak wydania (404)`, 'miss');
                     if (missStreak - lastMilestoneAt >= MISS_MILESTONE) {
@@ -842,7 +883,7 @@
                         isRunning = false;
                     }
                 } else if (res.status === 'error') {
-                    errorStreak++;
+                    session.errors++; errorStreak++; updateSessionUI();
                     log(`✖ ID ${res.id}: błąd — ${res.message}`, 'error');
                     if (errorStreak >= ERROR_STREAK_LIMIT) {
                         if (!errorLogged) {
@@ -856,7 +897,8 @@
         }
 
         const workers = [];
-        for (let i = 0; i < CONCURRENCY; i++) workers.push(worker());
+        const workerCount=Math.max(1,Math.min(64,parseInt(document.getElementById('workerInput').value,10)||CONCURRENCY));
+        for (let i = 0; i < workerCount; i++) workers.push(worker());
         await Promise.all(workers);
 
         clearInterval(speedIntervalHandle);
@@ -891,6 +933,7 @@
     }
 
     document.getElementById('gapFillBtn').addEventListener('click', handleGapFillClick);
+    document.getElementById('resumeBtn').addEventListener('click',()=>{if(!lastScan.nextId){log('Brak skanu do wznowienia.','error');return;}document.getElementById('startIdInput').value=lastScan.nextId;document.getElementById('endIdInput').value=lastScan.endId??'';handleGapFillClick();});
 
     // ============ START APLIKACJI ============
     async function init() {
