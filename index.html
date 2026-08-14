@@ -467,7 +467,7 @@
         browseMode = mode;
         selectedArtist = artist || null;
         toggleArtistsBtn.classList.toggle('active', browseMode !== 'search');
-        toggleArtistsBtn.textContent = browseMode === 'search' ? '🎤 Artyści' : '🔎 Szukaj';
+        toggleArtistsBtn.textContent = browseMode === 'search' ? 'Artyści' : 'Szukaj';
         renderSearchResults();
     }
 
@@ -496,7 +496,7 @@
     function setButtonsForRunningState() {
         const gapFillBtn = document.getElementById('gapFillBtn');
         gapFillBtn.classList.toggle('running', runningDirection === 'gapfill');
-        gapFillBtn.textContent = runningDirection === 'gapfill' ? '⏹ Zatrzymaj (uzupełnianie luk)' : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
+        gapFillBtn.textContent = runningDirection === 'gapfill' ? '⏹ Zatrzymaj (uzupełnianie luk)' : '⬇ Skanuj w dół od ID';
         const otherRunning = isRunning && runningDirection !== null;
         gapFillBtn.disabled = otherRunning && runningDirection !== 'gapfill';
     }
