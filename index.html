@@ -62,8 +62,8 @@
 
     .status-grid {
         display: grid;
-        grid-template-columns: 1fr;
-        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 14px;
     }
     .status-item { text-align: center; }
     .status-item .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -220,7 +220,7 @@
     .artist-back:hover { text-decoration: underline; }
 
     .extra-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.extra-toolbar select,.extra-toolbar input{padding:9px 10px;border:0;border-radius:8px;background:var(--panel-bg);color:var(--text)}
-    .mini-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:12px}.mini-stat{background:var(--panel-bg-alt);padding:10px;border-radius:10px;text-align:center}.mini-stat b{display:block;font-size:16px}.mini-stat span{font-size:10px;color:var(--muted);text-transform:uppercase}
+    .mini-stats{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}.mini-stat{background:var(--panel-bg-alt);padding:10px;border-radius:10px;text-align:center}.mini-stat b{display:block;font-size:16px}.mini-stat span{font-size:10px;color:var(--muted);text-transform:uppercase}
     .progress{height:8px;background:var(--panel-bg-alt);border-radius:99px;overflow:hidden;margin-top:12px}.progress>div{height:100%;width:0;background:var(--accent);transition:width .2s}.scan-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:5px}
     .artist-card{padding:12px;border-radius:10px;background:var(--panel-bg-alt);margin-bottom:7px;cursor:pointer}.artist-card:hover{background:#e4e2f4}.artist-card-top{display:flex;justify-content:space-between}.artist-card-name{font-weight:700}.artist-card-meta{font-size:11px;color:var(--muted);margin-top:5px}
 </style>
@@ -261,7 +261,9 @@
                     </div>
                 </div>
                 <div class="mini-stats">
-                    <div class="mini-stat"><b id="sessionFound">0</b><span>znaleziono</span></div><div class="mini-stat"><b id="sessionMiss">0</b><span>404</span></div><div class="mini-stat"><b id="sessionErrors">0</b><span>błędy</span></div><div class="mini-stat"><b id="sessionChecked">0</b><span>sprawdzono</span></div><div class="mini-stat"><b id="lastChecked">–</b><span>ostatnie ID</span></div>
+                    <div class="mini-stat"><b id="sessionResult">0 / 0</b><span>znaleziono / sprawdzono</span></div>
+                    <div class="mini-stat"><b id="sessionProblems">0 / 0</b><span>404 / błędy</span></div>
+                    <div class="mini-stat"><b id="lastChecked">–</b><span>ostatnie ID</span></div>
                 </div>
                 <div class="progress"><div id="scanProgress"></div></div><div class="scan-meta"><span id="progressText">Brak aktywnego skanu</span><span id="etaText">–</span></div>
             </div>
@@ -434,7 +436,7 @@
 
     function renderArtistsList() {
         const artists=getArtistsList();
-        searchResultsEl.innerHTML=artists.map(a=>`<div class="artist-card" data-artist="${escapeHtml(a.display)}"><div class="artist-card-top"><span class="artist-card-name">${escapeHtml(a.display)}</span><b>${a.count}</b></div><div class="artist-card-meta">${a.count?`ID ${a.minId.toLocaleString('pl-PL')} → ${a.maxId.toLocaleString('pl-PL')}`:'Brak zapisanych wydań'}</div></div>`).join('')+'<div class="search-count">Dokładnie 5 artystów.</div>';
+        searchResultsEl.innerHTML=artists.map(a=>`<div class="artist-card" data-artist="${escapeHtml(a.display)}"><div class="artist-card-top"><span class="artist-card-name">${escapeHtml(a.display)}</span><b>${a.count}</b></div><div class="artist-card-meta">${a.count?`ID ${a.minId.toLocaleString('pl-PL')} → ${a.maxId.toLocaleString('pl-PL')}`:'Brak zapisanych wydań'}</div></div>`).join('')+'<div class="search-count">Lista artystów.</div>';
     }
 
     function renderArtistDetail(artistName) {
@@ -508,7 +510,7 @@
 
     let session={checked:0,found:0,miss:0,errors:0,lastId:null};
     let lastScan={nextId:null,endId:null};
-    function updateSessionUI(){for(const [id,val] of [['sessionFound',session.found],['sessionMiss',session.miss],['sessionErrors',session.errors],['sessionChecked',session.checked]]) document.getElementById(id).textContent=val.toLocaleString('pl-PL');document.getElementById('lastChecked').textContent=session.lastId==null?'–':session.lastId.toLocaleString('pl-PL');}
+    function updateSessionUI(){document.getElementById('sessionResult').textContent=`${session.found.toLocaleString('pl-PL')} / ${session.checked.toLocaleString('pl-PL')}`;document.getElementById('sessionProblems').textContent=`${session.miss.toLocaleString('pl-PL')} / ${session.errors.toLocaleString('pl-PL')}`;document.getElementById('lastChecked').textContent=session.lastId==null?'–':session.lastId.toLocaleString('pl-PL');}
     function exportItems(items,name){const blob=new Blob([JSON.stringify(items.sort((a,b)=>a.id-b.id),null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
     document.getElementById('workerInput').addEventListener('change',e=>{e.target.value=Math.max(1,Math.min(64,Number(e.target.value)||16));});
 
