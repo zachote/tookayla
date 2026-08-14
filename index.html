@@ -164,21 +164,6 @@
     button.toggle-mode { background-color: var(--panel-bg-alt); color: var(--text); flex-shrink: 0; }
     button.toggle-mode.active { background-color: var(--accent); color: #ffffff; }
 
-    .artist-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-    .artist-row .artist-chip { margin-bottom: 0; flex: 1; min-width: 0; }
-    .artist-remove {
-        background: var(--panel-bg-alt);
-        border: none;
-        border-radius: 8px;
-        padding: 8px 11px;
-        cursor: pointer;
-        color: var(--muted);
-        flex-shrink: 0;
-        font-size: 13px;
-        line-height: 1;
-    }
-    .artist-remove:hover { background: #e4e2f4; color: var(--err); }
-
     .artist-chip {
         display: flex;
         width: 100%;
@@ -290,10 +275,6 @@
                     <input type="text" id="searchInput" placeholder="tytuł, artysta lub ID...">
                     <button type="button" id="toggleArtistsBtn" class="toggle-mode">🎤 Artyści</button>
                 </div>
-                <div class="controls-row" id="addArtistRow" style="display:none;">
-                    <input type="text" id="newArtistInput" placeholder="dodaj artystę do listy...">
-                    <button type="button" id="addArtistBtn" class="secondary">➕ Dodaj</button>
-                </div>
                 <div id="searchResults" class="search-results"></div>
             </div>
         </div>
@@ -328,25 +309,6 @@
 
     let browseMode = 'search'; // 'search' | 'artists' | 'artist-detail'
     let selectedArtist = null;
-
-    // ============ ULUBIENI ARTYŚCI (zapisywani w localStorage w tej przeglądarce) ============
-    const FAVORITE_ARTISTS_KEY = 'toolost_favorite_artists';
-    const DEFAULT_FAVORITE_ARTISTS = ['BJ Lips', 'Ayesha Erotica', 'MISS LUXURY', 'Cece Natalie', 'shitzulover07'];
-
-    function loadFavoriteArtists() {
-        try {
-            const raw = localStorage.getItem(FAVORITE_ARTISTS_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed) && parsed.every(x => typeof x === 'string')) return parsed;
-            }
-        } catch (e) { /* ignoruj — użyj domyślnej listy */ }
-        return DEFAULT_FAVORITE_ARTISTS.slice();
-    }
-    function saveFavoriteArtists() {
-        try { localStorage.setItem(FAVORITE_ARTISTS_KEY, JSON.stringify(favoriteArtists)); } catch (e) { /* localStorage niedostępny */ }
-    }
-    let favoriteArtists = loadFavoriteArtists();
 
     // ============ POMOCNICZE ============
     function toBase64(str) {
@@ -431,45 +393,42 @@
             : `<div class="search-count">${footerText || `${items.length} wynik(ów).`}</div>`);
     }
 
+    // Lista artystów widocznych w zakładce „Artyści”.
+    // Celowo ograniczona wyłącznie do tych pięciu nazw.
+    const IMPORTANT_ARTISTS = [
+        'Ayesha Erotica',
+        'BJ Lips',
+        'shitzulover07',
+        'Cece Natalie',
+        'MISS LUXURY'
+    ];
+
     function getArtistsList() {
-        const map = new Map(); // znormalizowana nazwa -> { display, count }
+        const counts = new Map();
         for (const item of itemsMap.values()) {
             const key = normalizeSearch(item.artist);
-            if (!map.has(key)) map.set(key, { display: item.artist, count: 0 });
-            map.get(key).count++;
+            counts.set(key, (counts.get(key) || 0) + 1);
         }
-        return Array.from(map.values()).sort((a, b) => b.count - a.count || a.display.localeCompare(b.display, 'pl'));
+
+        // Zachowujemy dokładnie kolejność i pisownię z IMPORTANT_ARTISTS.
+        return IMPORTANT_ARTISTS.map(display => ({
+            display,
+            count: counts.get(normalizeSearch(display)) || 0
+        }));
     }
 
-    function getArtistsList() {
-        // Twoja lista "najistotniejszych"
-        const importantArtists = [
-            "Ayesha Erotica",
-            "BJ Lips",
-            "shitzulover07",
-            "Cece Natalie",
-            "MISS LUXURY"
-        ];
-
-        const map = new Map();
-        
-        // Zliczamy wystąpienia tylko dla artystów z listy
-        for (const item of itemsMap.values()) {
-            // Szukamy pasującego artysty (ignorując wielkość liter)
-            const foundArtist = importantArtists.find(name => 
-                name.toLowerCase() === item.artist.toLowerCase()
-            );
-
-            if (foundArtist) {
-                if (!map.has(foundArtist)) {
-                    map.set(foundArtist, { display: foundArtist, count: 0 });
-                }
-                map.get(foundArtist).count++;
-            }
+    function renderArtistsList() {
+        const artists = getArtistsList();
+        if (artists.length === 0) {
+            searchResultsEl.innerHTML = '<div class="search-empty">Brak zapisanych artystów — wczytaj lub zeskanuj wydania.</div>';
+            return;
         }
-
-        // Zwracamy listę w kolejności alfabetycznej (lub jakiejkolwiek innej)
-        return Array.from(map.values()).sort((a, b) => a.display.localeCompare(b.display));
+        searchResultsEl.innerHTML = artists.map(a => `
+            <button type="button" class="artist-chip" data-artist="${escapeHtml(a.display)}">
+                <span class="artist-chip-name">${escapeHtml(a.display)}</span>
+                <span class="artist-chip-count">${a.count}</span>
+            </button>
+        `).join('') + `<div class="search-count">${artists.length} artyst(ów).</div>`;
     }
 
     function renderArtistDetail(artistName) {
