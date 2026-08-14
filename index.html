@@ -164,6 +164,21 @@
     button.toggle-mode { background-color: var(--panel-bg-alt); color: var(--text); flex-shrink: 0; }
     button.toggle-mode.active { background-color: var(--accent); color: #ffffff; }
 
+    .artist-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .artist-row .artist-chip { margin-bottom: 0; flex: 1; min-width: 0; }
+    .artist-remove {
+        background: var(--panel-bg-alt);
+        border: none;
+        border-radius: 8px;
+        padding: 8px 11px;
+        cursor: pointer;
+        color: var(--muted);
+        flex-shrink: 0;
+        font-size: 13px;
+        line-height: 1;
+    }
+    .artist-remove:hover { background: #e4e2f4; color: var(--err); }
+
     .artist-chip {
         display: flex;
         width: 100%;
@@ -275,6 +290,10 @@
                     <input type="text" id="searchInput" placeholder="tytuł, artysta lub ID...">
                     <button type="button" id="toggleArtistsBtn" class="toggle-mode">🎤 Artyści</button>
                 </div>
+                <div class="controls-row" id="addArtistRow" style="display:none;">
+                    <input type="text" id="newArtistInput" placeholder="dodaj artystę do listy...">
+                    <button type="button" id="addArtistBtn" class="secondary">➕ Dodaj</button>
+                </div>
                 <div id="searchResults" class="search-results"></div>
             </div>
         </div>
@@ -309,6 +328,25 @@
 
     let browseMode = 'search'; // 'search' | 'artists' | 'artist-detail'
     let selectedArtist = null;
+
+    // ============ ULUBIENI ARTYŚCI (zapisywani w localStorage w tej przeglądarce) ============
+    const FAVORITE_ARTISTS_KEY = 'toolost_favorite_artists';
+    const DEFAULT_FAVORITE_ARTISTS = ['BJ Lips', 'Ayesha Erotica', 'MISS LUXURY', 'Cece Natalie', 'shitzulover07'];
+
+    function loadFavoriteArtists() {
+        try {
+            const raw = localStorage.getItem(FAVORITE_ARTISTS_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.every(x => typeof x === 'string')) return parsed;
+            }
+        } catch (e) { /* ignoruj — użyj domyślnej listy */ }
+        return DEFAULT_FAVORITE_ARTISTS.slice();
+    }
+    function saveFavoriteArtists() {
+        try { localStorage.setItem(FAVORITE_ARTISTS_KEY, JSON.stringify(favoriteArtists)); } catch (e) { /* localStorage niedostępny */ }
+    }
+    let favoriteArtists = loadFavoriteArtists();
 
     // ============ POMOCNICZE ============
     function toBase64(str) {
