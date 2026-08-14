@@ -441,18 +441,35 @@
         return Array.from(map.values()).sort((a, b) => b.count - a.count || a.display.localeCompare(b.display, 'pl'));
     }
 
-    function renderArtistsList() {
-        const artists = getArtistsList();
-        if (artists.length === 0) {
-            searchResultsEl.innerHTML = '<div class="search-empty">Brak zapisanych artystów — wczytaj lub zeskanuj wydania.</div>';
-            return;
+    function getArtistsList() {
+        // Twoja lista "najistotniejszych"
+        const importantArtists = [
+            "Ayesha Erotica",
+            "BJ Lips",
+            "shitzulover07",
+            "Cece Natalie",
+            "MISS LUXURY"
+        ];
+
+        const map = new Map();
+        
+        // Zliczamy wystąpienia tylko dla artystów z listy
+        for (const item of itemsMap.values()) {
+            // Szukamy pasującego artysty (ignorując wielkość liter)
+            const foundArtist = importantArtists.find(name => 
+                name.toLowerCase() === item.artist.toLowerCase()
+            );
+
+            if (foundArtist) {
+                if (!map.has(foundArtist)) {
+                    map.set(foundArtist, { display: foundArtist, count: 0 });
+                }
+                map.get(foundArtist).count++;
+            }
         }
-        searchResultsEl.innerHTML = artists.map(a => `
-            <button type="button" class="artist-chip" data-artist="${escapeHtml(a.display)}">
-                <span class="artist-chip-name">${escapeHtml(a.display)}</span>
-                <span class="artist-chip-count">${a.count}</span>
-            </button>
-        `).join('') + `<div class="search-count">${artists.length} artyst(ów).</div>`;
+
+        // Zwracamy listę w kolejności alfabetycznej (lub jakiejkolwiek innej)
+        return Array.from(map.values()).sort((a, b) => a.display.localeCompare(b.display));
     }
 
     function renderArtistDetail(artistName) {
