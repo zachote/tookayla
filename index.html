@@ -62,10 +62,15 @@
 
     .status-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 14px;
     }
-    .status-item { text-align: center; }
+    .status-item {
+        text-align: center;
+        background: var(--panel-bg-alt);
+        padding: 10px;
+        border-radius: 10px;
+    }
     .status-item .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
     .status-item .value { font-size: 17px; font-weight: 700; margin-top: 2px; }
 
@@ -260,12 +265,6 @@
                         <div class="value" id="statRateLimit">–</div>
                     </div>
                 </div>
-                <div class="mini-stats">
-                    <div class="mini-stat"><b id="sessionResult">0 / 0</b><span>znaleziono / sprawdzono</span></div>
-                    <div class="mini-stat"><b id="sessionProblems">0 / 0</b><span>404 / błędy</span></div>
-                    <div class="mini-stat"><b id="lastChecked">–</b><span>ostatnie ID</span></div>
-                </div>
-                <div class="progress"><div id="scanProgress"></div></div><div class="scan-meta"><span id="progressText">Brak aktywnego skanu</span><span id="etaText">–</span></div>
             </div>
 
             <div class="panel alt">
@@ -287,8 +286,7 @@
                 </div>
                 <div class="controls-row">
                     <button id="gapFillBtn">⬇ Skanuj w dół od ID</button>
-                    <button id="scanToggleBtn" class="secondary" disabled>▶ Wznów</button>
-                </div>
+                                    </div>
             </div>
 
             <div class="panel alt">
@@ -395,7 +393,6 @@
     const searchInput = document.getElementById('searchInput');
     const searchResultsEl = document.getElementById('searchResults');
     const toggleArtistsBtn = document.getElementById('toggleArtistsBtn');
-    const scanToggleBtn = document.getElementById('scanToggleBtn');
     let searchDebounceHandle = null;
 
     function renderItemsList(items, emptyText, footerText) {
@@ -510,7 +507,6 @@
 
     let session={checked:0,found:0,miss:0,errors:0,lastId:null};
     let lastScan={nextId:null,endId:null};
-    function updateSessionUI(){document.getElementById('sessionResult').textContent=`${session.found.toLocaleString('pl-PL')} / ${session.checked.toLocaleString('pl-PL')}`;document.getElementById('sessionProblems').textContent=`${session.miss.toLocaleString('pl-PL')} / ${session.errors.toLocaleString('pl-PL')}`;document.getElementById('lastChecked').textContent=session.lastId==null?'–':session.lastId.toLocaleString('pl-PL');}
     function exportItems(items,name){const blob=new Blob([JSON.stringify(items.sort((a,b)=>a.id-b.id),null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
     document.getElementById('workerInput').addEventListener('change',e=>{e.target.value=Math.max(1,Math.min(64,Number(e.target.value)||16));});
 
@@ -521,10 +517,6 @@
             ? '⏹ Zatrzymaj (uzupełnianie luk)'
             : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
         gapFillBtn.disabled = isRunning && runningDirection !== 'gapfill';
-
-        scanToggleBtn.disabled = !isRunning && !lastScan.nextId;
-        scanToggleBtn.classList.toggle('paused', !isRunning && !!lastScan.nextId);
-        scanToggleBtn.textContent = isRunning ? '⏸ Pauza' : '▶ Wznów';
     }
 
     // ============ WCZYTYWANIE Z GIST (z automatycznym ponawianiem aż do skutku) ============
@@ -843,10 +835,10 @@
                 }
 
                 const res = await fetchOne(id);
-                checkedSinceTick++; session.checked++; session.lastId=id; updateSessionUI();
+                checkedSinceTick++; session.checked++; session.lastId=id;
 
                 if (res.status === 'found') {
-                    session.found++; updateSessionUI();
+                    session.found++;
                     const item = { id: res.id, title: res.title, artist: res.artist };
                     const isNew = addItemToMemory(item);
                     if (isNew) pendingNewItems.push(item);
@@ -856,7 +848,7 @@
                     log(`✔ ID ${res.id} — "${res.title}" — ${res.artist}`, 'found');
                     updateStatusBar();
                 } else if (res.status === 'notfound') {
-                    session.miss++; missStreak++; updateSessionUI();
+                    session.miss++; missStreak++;
                     errorStreak = 0;
                     log(`— ID ${res.id}: brak wydania (404)`, 'miss');
                     if (missStreak - lastMilestoneAt >= MISS_MILESTONE) {
@@ -871,7 +863,7 @@
                         isRunning = false;
                     }
                 } else if (res.status === 'error') {
-                    session.errors++; errorStreak++; updateSessionUI();
+                    session.errors++; errorStreak++;
                     log(`✖ ID ${res.id}: błąd — ${res.message}`, 'error');
                     if (errorStreak >= ERROR_STREAK_LIMIT) {
                         if (!errorLogged) {
@@ -921,21 +913,6 @@
     }
 
     document.getElementById('gapFillBtn').addEventListener('click', handleGapFillClick);
-    scanToggleBtn.addEventListener('click', () => {
-        if (isRunning) {
-            isRunning = false;
-            setButtonsForRunningState();
-            log('Pauzowanie skanu (po zakończeniu bieżących żądań)...', 'info');
-            return;
-        }
-        if (!lastScan.nextId) {
-            log('Brak skanu do wznowienia.', 'error');
-            return;
-        }
-        document.getElementById('startIdInput').value = lastScan.nextId;
-        document.getElementById('endIdInput').value = lastScan.endId ?? '';
-        handleGapFillClick();
-    });
 
     // ============ START APLIKACJI ============
     async function init() {
