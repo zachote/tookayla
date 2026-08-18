@@ -309,7 +309,7 @@
     const CONCURRENCY = 16;         // ile żądań w locie jednocześnie (pula workerów, nie paczki z przerwą)
     const REQUEST_TIMEOUT_MS = 12000;
     const MISS_MILESTONE = 30;      // co tyle kolejnych 404 z rzędu wypisujemy przypomnienie (NIE zatrzymuje skanowania)
-    const MISS_SAFETY_LIMIT = 3000; // bezpiecznik: tyle kolejnych 404 = przerwij, żeby nie skanować bez końca w razie awarii (to NIE oznacza pewnego końca zakresu)
+    const MISS_SAFETY_LIMIT = 99999; // bezpiecznik: tyle kolejnych 404 = przerwij, żeby nie skanować bez końca w razie awarii (to NIE oznacza pewnego końca zakresu)
     const ERROR_STREAK_LIMIT = 50;  // tyle kolejnych błędów sieci = przerwij (coś nie działa)
     const MAX_LOG_LINES = 500;      // ile linii trzymamy w konsoli (starsze są usuwane)
     const SPEED_UPDATE_MS = 1000;   // jak często odświeżamy licznik ID/s
