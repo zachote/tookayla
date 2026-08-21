@@ -1,37 +1,44 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TooKayla</title>
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700;800;900&display=swap');
+
     :root {
-        --bg: #f2f1f8;
-        --text: #16161a;
-        --muted: #77778a;
-        --panel-bg: #fbfbfe;
-        --panel-bg-alt: #eeedf6;
-        --btn-bg: #16161a;
-        --btn-text: #ffffff;
+        --bg: #000000;
+        --text: #ffffff;
+        --muted: #7a7a7a;
+        --panel-bg: #0a0a0a;
+        --panel-bg-alt: #111111;
+        --border: #1d1d1d;
+        --border-alt: #2a2a2a;
+        --hover-bg: #161616;
+        --btn-bg: #ffffff;
+        --btn-text: #000000;
         --btn-stop-bg: #b3261e;
-        --console-bg: #111114;
-        --console-text: #d8d8e0;
+        --console-bg: #000000;
+        --console-text: #d8d8d8;
         --ok: #ffffff;
-        --miss: #6c6c78;
-        --err: #ff6b6b;
-        --info: #a99cff;
-        --accent: #6a5ff0;
+        --miss: #5a5a5a;
+        --err: #ff5c5c;
+        --info: #9a9aff;
+        --accent: #ffffff;
     }
-    * { box-sizing: border-box; }
+    * {
+        box-sizing: border-box;
+        font-family: 'Red Hat Display', -apple-system, Segoe UI, Arial, sans-serif !important;
+    }
     html, body { height: 100%; }
     body {
-        font-family: -apple-system, Segoe UI, Arial, sans-serif;
         background-color: var(--bg);
         color: var(--text);
         margin: 0;
         overflow: hidden;
     }
-    h1 { text-align: center; margin: 0 0 4px; font-size: 22px; }
+    h1 { text-align: center; margin: 0 0 4px; font-size: 22px; font-weight: 800; }
     .subtitle { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 20px; }
 
     .col-console {
@@ -54,25 +61,17 @@
     .col-controls-inner { display: flex; flex-direction: column; gap: 16px; }
 
     .panel {
-        background: var(--panel-bg);
-        border-radius: 14px;
-        padding: 18px 20px;
+        border: 1px solid var(--border);
+        border-radius: 25px;
+        padding: 20px;
     }
-    .panel.alt { background: var(--panel-bg-alt); }
 
-    .status-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 14px;
+    .panel-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 18px 0;
+        border: none;
     }
-    .status-item {
-        text-align: center;
-        background: var(--panel-bg-alt);
-        padding: 10px;
-        border-radius: 10px;
-    }
-    .status-item .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .status-item .value { font-size: 17px; font-weight: 700; margin-top: 2px; }
 
     .controls-row {
         display: flex;
@@ -84,48 +83,66 @@
     .controls-row + .controls-row { margin-top: 12px; }
 
     label.field-label {
-        font-size: 12px;
+        font-size: 11px;
         color: var(--muted);
         margin-right: 4px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
     }
 
     input[type="number"], input[type="text"] {
         padding: 10px 12px;
         font-size: 14px;
-        border-radius: 8px;
-        border: none;
-        background: var(--panel-bg-alt);
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: var(--bg);
         color: var(--text);
+        font-family: inherit;
     }
     input[type="number"]:focus, input[type="text"]:focus {
-        outline: 2px solid var(--accent);
-        outline-offset: 0;
+        outline: none;
+        border-color: var(--border-alt);
     }
-    input[type="number"] { width: 160px; }
     input[type="text"] { flex: 1; min-width: 200px; }
 
     button {
         padding: 10px 16px;
         font-size: 14px;
-        font-weight: 600;
+        font-weight: 700;
         background-color: var(--btn-bg);
         color: var(--btn-text);
-        border: none;
-        border-radius: 8px;
+        border: 1px solid var(--btn-bg);
+        border-radius: 14px;
         cursor: pointer;
+        font-family: inherit;
+        transition: opacity 0.15s, background-color 0.15s, color 0.15s, border-color 0.15s;
+        letter-spacing: 0.01em;
     }
     button:hover { opacity: 0.85; }
-    button:disabled { opacity: 0.35; cursor: not-allowed; }
-    button.secondary { background-color: #48485a; }
-    button.running { background-color: var(--btn-stop-bg); }
-    button.paused { background-color: #a8781e; }
+    button:disabled { opacity: 0.3; cursor: not-allowed; }
+    button.secondary {
+        background-color: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+    }
+    button.secondary:hover { background-color: var(--hover-bg); opacity: 1; }
+    button.running { background-color: var(--btn-stop-bg); border-color: var(--btn-stop-bg); color: #ffffff; }
+    button.paused { background-color: #a8781e; border-color: #a8781e; color: #ffffff; }
 
-    .console-panel {
+    .console-box {
         background: var(--console-bg);
-        color: var(--console-text);
-        border-radius: 14px;
-        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
         height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .console-panel {
+        color: var(--console-text);
+        padding: 14px 16px;
+        flex: 1 1 auto;
+        min-height: 0;
         overflow-y: auto;
         font-family: "SF Mono", Consolas, Menlo, monospace;
         font-size: 12.5px;
@@ -136,7 +153,33 @@
     .log-miss { color: var(--miss); }
     .log-error { color: var(--err); }
     .log-info { color: var(--info); font-weight: 600; }
-    .log-time { color: #666; margin-right: 6px; }
+    .log-time { color: #555; margin-right: 6px; }
+
+    .console-stats {
+        flex: 0 0 auto;
+        padding: 12px 14px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .status-item {
+        text-align: center;
+        padding: 8px 4px;
+        border-radius: 15px;
+        background: var(--console-bg);
+        border: 1px solid var(--border);
+    }
+    .status-item .label { font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .status-item .value {
+        font-size: 14px;
+        font-weight: 700;
+        margin-top: 3px;
+        color: var(--text);
+        font-family: "SF Mono", Consolas, Menlo, monospace;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 
     .save-status {
         text-align: center;
@@ -145,6 +188,13 @@
         margin-top: 10px;
     }
 
+    .field-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 130px; }
+    .field-group label.field-label { margin: 0; }
+    .field-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .panel-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .panel-actions button { flex: 1; min-width: 150px; }
+    .panel-actions.secondary-row button { flex: 1; min-width: 120px; }
+
     .search-results { margin-top: 10px; max-height: 320px; overflow-y: auto; }
     .search-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 14px 0; }
     .search-item {
@@ -152,22 +202,34 @@
         justify-content: space-between;
         align-items: center;
         gap: 10px;
-        padding: 10px 12px;
-        border-radius: 8px;
-        background: var(--panel-bg-alt);
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--bg);
+        border: 1px solid var(--border);
         margin-bottom: 6px;
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: background-color 0.15s, border-color 0.15s;
     }
-    .search-item:hover { background: #e4e2f4; }
+    .search-item:hover { background: var(--hover-bg); border-color: var(--border-alt); }
     .search-item-main { min-width: 0; }
+    .search-item-arrow {
+        font-size: 15px;
+        color: var(--muted);
+        flex-shrink: 0;
+        opacity: 0;
+        transform: translateX(-4px);
+        transition: opacity 0.15s, transform 0.15s, color 0.15s;
+    }
+    .search-item:hover .search-item-arrow { opacity: 1; transform: translateX(0); color: var(--text); }
     .search-item-title { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .search-item-artist { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .search-item a { font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; flex-shrink: 0; }
-    .search-item a:hover { text-decoration: underline; }
     .search-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
     .hint-text { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
 
-    button.toggle-mode { background-color: var(--panel-bg-alt); color: var(--text); flex-shrink: 0; }
-    button.toggle-mode.active { background-color: var(--accent); color: #ffffff; }
+    button.toggle-mode { background-color: var(--bg); color: var(--text); border: 1px solid var(--border); flex-shrink: 0; }
+    button.toggle-mode.active { background-color: var(--accent); color: #000000; border-color: var(--accent); }
 
     .artist-chip {
         display: flex;
@@ -176,102 +238,104 @@
         align-items: center;
         gap: 10px;
         padding: 10px 12px;
-        border-radius: 8px;
+        border-radius: 14px;
         background: var(--panel-bg-alt);
         margin-bottom: 6px;
-        border: none;
+        border: 1px solid var(--border);
         font-family: inherit;
         text-align: left;
         cursor: pointer;
         color: var(--text);
     }
-    .artist-chip:hover { background: #e4e2f4; }
+    .artist-chip:hover { background: var(--hover-bg); }
     .artist-chip-name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .artist-sort-select {
         padding: 10px 12px;
         font-size: 13px;
-        border-radius: 8px;
-        border: none;
+        border-radius: 14px;
+        border: 1px solid var(--border);
         background: var(--panel-bg-alt);
         color: var(--text);
         cursor: pointer;
+        font-family: inherit;
     }
-    .artist-sort-select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+    .artist-sort-select:focus { outline: none; border-color: var(--border-alt); }
     .artist-chip-count {
         font-size: 11.5px;
         color: var(--muted);
-        background: var(--panel-bg);
+        background: var(--console-bg);
+        border: 1px solid var(--border);
         border-radius: 999px;
         padding: 2px 8px;
         flex-shrink: 0;
     }
-    .artist-detail-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-    }
-    .artist-detail-title { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .artist-back {
-        font-size: 12px;
-        color: var(--accent);
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-family: inherit;
-        flex-shrink: 0;
-        padding: 4px 6px;
-    }
-    .artist-back:hover { text-decoration: underline; }
-
-    .extra-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.extra-toolbar select,.extra-toolbar input{padding:9px 10px;border:0;border-radius:8px;background:var(--panel-bg);color:var(--text)}
-    .mini-stats{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}.mini-stat{background:var(--panel-bg-alt);padding:10px;border-radius:10px;text-align:center}.mini-stat b{display:block;font-size:16px}.mini-stat span{font-size:10px;color:var(--muted);text-transform:uppercase}
+    .extra-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.extra-toolbar select,.extra-toolbar input{padding:9px 10px;border:1px solid var(--border);border-radius:14px;background:var(--panel-bg-alt);color:var(--text)}
+    .mini-stats{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}.mini-stat{background:var(--panel-bg-alt);border:1px solid var(--border);padding:10px;border-radius:14px;text-align:center}.mini-stat b{display:block;font-size:16px}.mini-stat span{font-size:10px;color:var(--muted);text-transform:uppercase}
     .progress{height:8px;background:var(--panel-bg-alt);border-radius:99px;overflow:hidden;margin-top:12px}.progress>div{height:100%;width:0;background:var(--accent);transition:width .2s}.scan-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:5px}
-    .artist-card{padding:12px;border-radius:10px;background:var(--panel-bg-alt);margin-bottom:7px;cursor:pointer}.artist-card:hover{background:#e4e2f4}.artist-card-top{display:flex;justify-content:space-between}.artist-card-name{font-weight:700}.artist-card-meta{font-size:11px;color:var(--muted);margin-top:5px}
+    .artist-card{padding:12px 14px;border-radius:14px;background:var(--bg);border:1px solid var(--border);margin-bottom:7px;cursor:pointer;transition:background-color 0.15s, border-color 0.15s}.artist-card:hover{background:var(--hover-bg);border-color:var(--border-alt)}.artist-card-top{display:flex;justify-content:space-between}.artist-card-name{font-weight:700}.artist-card-meta{font-size:11px;color:var(--muted);margin-top:5px}
 </style>
 </head>
 <body>
     <div class="col-console">
-        <div class="console-panel" id="console"></div>
+        <div class="console-box">
+            <div class="console-panel" id="console"></div>
+            <div class="console-stats">
+                <div class="status-item">
+                    <div class="label">Saved Releases</div>
+                    <div class="value" id="statTotal">–</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">ID Range</div>
+                    <div class="value" id="statRange">–</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Pending Upload</div>
+                    <div class="value" id="statPending">0</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Speed</div>
+                    <div class="value" id="statSpeed">–</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">Last Upload</div>
+                    <div class="value" id="statUpload">–</div>
+                </div>
+                <div class="status-item">
+                    <div class="label">GitHub API Limit</div>
+                    <div class="value" id="statRateLimit">–</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="col-controls">
 
         <div class="col-controls-inner">
             <div class="panel">
-                <div class="status-grid">
-                    <div class="status-item">
-                        <div class="label">Zapisanych wydań</div>
-                        <div class="value" id="statTotal">–</div>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label class="field-label" for="startIdInput">Start ID</label>
+                        <input type="number" id="startIdInput" placeholder="e.g. 1350000">
                     </div>
-                    <div class="status-item">
-                        <div class="label">Zakres ID</div>
-                        <div class="value" id="statRange">–</div>
+                    <div class="field-group">
+                        <label class="field-label" for="endIdInput">End ID</label>
+                        <input type="number" id="endIdInput" placeholder="optional">
                     </div>
-                    <div class="status-item">
-                        <div class="label">Do wysłania</div>
-                        <div class="value" id="statPending">0</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="label">Prędkość</div>
-                        <div class="value" id="statSpeed">–</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="label">Ostatni upload</div>
-                        <div class="value" id="statUpload">–</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="label">Limit GitHub API</div>
-                        <div class="value" id="statRateLimit">–</div>
+                    <div class="field-group" style="max-width: 110px;">
+                        <label class="field-label" for="workerInput">Workers</label>
+                        <input type="number" id="workerInput" min="1" max="64" value="16">
                     </div>
                 </div>
-            </div>
+                <div class="panel-actions">
+                    <button id="gapFillBtn">Scan Down From ID</button>
+                </div>
 
-            <div class="panel alt">
-                <div class="controls-row">
-                    <button id="uploadBtn" class="secondary">⬆️ Zuploaduj nowe dane</button>
-                    <button id="exportBtn" class="secondary">💾 Eksportuj JSON</button>
-                    <button id="importBtn" class="secondary">📥 Importuj JSON</button>
+                <hr class="panel-divider">
+
+                <div class="panel-actions secondary-row">
+                    <button id="uploadBtn" class="secondary">Upload New Data</button>
+                    <button id="exportBtn" class="secondary">Export JSON</button>
+                    <button id="importBtn" class="secondary">Import JSON</button>
                     <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
                 </div>
                 <div class="save-status" id="saveStatus"></div>
@@ -279,21 +343,8 @@
 
             <div class="panel">
                 <div class="controls-row">
-                    <label class="field-label" for="startIdInput">ID startowe:</label>
-                    <input type="number" id="startIdInput" placeholder="np. 1350000">
-                    <label class="field-label" for="endIdInput">ID końcowe:</label><input type="number" id="endIdInput" placeholder="opcjonalnie">
-                    <label class="field-label" for="workerInput">Workerów:</label><input type="number" id="workerInput" min="1" max="64" value="16">
-                </div>
-                <div class="controls-row">
-                    <button id="gapFillBtn">⬇ Skanuj w dół od ID</button>
-                                    </div>
-            </div>
-
-            <div class="panel alt">
-                <div class="controls-row">
-                    <label class="field-label" for="searchInput">Przeglądarka zapisanych wydań:</label>
-                    <input type="text" id="searchInput" placeholder="tytuł, artysta lub ID...">
-                    <button type="button" id="toggleArtistsBtn" class="toggle-mode">Artyści</button>
+                    <input type="text" id="searchInput" placeholder="title, artist, or ID...">
+                    <button type="button" id="toggleArtistsBtn" class="toggle-mode">Artists</button>
                 </div>
                 <div id="searchResults" class="search-results"></div>
             </div>
@@ -302,20 +353,20 @@
 </div>
 
 <script>
-    // ============ KONFIGURACJA ============
-    // ID Twojego Gista — samo ID jest bezpieczne w kodzie klienta (pozwala tylko na odczyt).
+    // ============ CONFIGURATION ============
+    // Your Gist ID — the ID alone is safe to keep in client-side code (it only allows read access).
     const GIST_ID = '2f3945ff4ab15e56a30cb733f6549d34';
 
-    const CONCURRENCY = 16;         // ile żądań w locie jednocześnie (pula workerów, nie paczki z przerwą)
+    const CONCURRENCY = 16;         // how many requests run at once (worker pool, not batched with delays)
     const REQUEST_TIMEOUT_MS = 12000;
-    const MISS_MILESTONE = 30;      // co tyle kolejnych 404 z rzędu wypisujemy przypomnienie (NIE zatrzymuje skanowania)
-    const MISS_SAFETY_LIMIT = 99999; // bezpiecznik: tyle kolejnych 404 = przerwij, żeby nie skanować bez końca w razie awarii (to NIE oznacza pewnego końca zakresu)
-    const ERROR_STREAK_LIMIT = 50;  // tyle kolejnych błędów sieci = przerwij (coś nie działa)
-    const MAX_LOG_LINES = 500;      // ile linii trzymamy w konsoli (starsze są usuwane)
-    const SPEED_UPDATE_MS = 1000;   // jak często odświeżamy licznik ID/s
-    const UPLOAD_BATCH_BYTES = 300 * 1024; // maks. rozmiar JSON-a jednej paczki wysyłanej do /api/save-gist (bezpiecznie poniżej limitu payloadu Vercela)
+    const MISS_MILESTONE = 30;      // log a reminder every this many consecutive 404s (does NOT stop scanning)
+    const MISS_SAFETY_LIMIT = 99999; // safety limit: this many consecutive 404s = stop, to avoid scanning forever on failure (does NOT necessarily mean the end of the range)
+    const ERROR_STREAK_LIMIT = 50;  // this many consecutive network errors = stop (something's wrong)
+    const MAX_LOG_LINES = 500;      // how many lines to keep in the console (older ones are removed)
+    const SPEED_UPDATE_MS = 1000;   // how often to refresh the ID/s counter
+    const UPLOAD_BATCH_BYTES = 300 * 1024; // max JSON size per batch sent to /api/save-gist (safely under Vercel's payload limit)
 
-    // ============ STAN ============
+    // ============ STATE ============
     let itemsMap = new Map();   // id -> item
     let minId = null;
     let maxId = null;
@@ -327,10 +378,9 @@
     let isUploading = false;
     let speedIntervalHandle = null;
 
-    let browseMode = 'search'; // 'search' | 'artists' | 'artist-detail'
-    let selectedArtist = null;
+    let browseMode = 'search'; // 'search' | 'artists'
 
-    // ============ POMOCNICZE ============
+    // ============ HELPERS ============
     function toBase64(str) {
         return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
             (m, p1) => String.fromCharCode('0x' + p1)));
@@ -341,7 +391,7 @@
         const wasNearBottom = consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 60;
         const line = document.createElement('div');
         line.className = `log-line log-${type}`;
-        const time = new Date().toLocaleTimeString('pl-PL');
+        const time = new Date().toLocaleTimeString('en-US');
         line.innerHTML = `<span class="log-time">${time}</span>${escapeHtml(message)}`;
         consoleEl.appendChild(line);
         while (consoleEl.children.length > MAX_LOG_LINES) {
@@ -362,11 +412,11 @@
     }
 
     function updateStatusBar() {
-        document.getElementById('statTotal').textContent = itemsMap.size.toLocaleString('pl-PL');
+        document.getElementById('statTotal').textContent = itemsMap.size.toLocaleString('en-US');
         document.getElementById('statRange').textContent = (minId !== null && maxId !== null)
-            ? `${minId.toLocaleString('pl-PL')} – ${maxId.toLocaleString('pl-PL')}`
+            ? `${minId.toLocaleString('en-US')} – ${maxId.toLocaleString('en-US')}`
             : '–';
-        document.getElementById('statPending').textContent = pendingNewItems.length.toLocaleString('pl-PL');
+        document.getElementById('statPending').textContent = pendingNewItems.length.toLocaleString('en-US');
     }
 
     function setSaveStatus(text) {
@@ -376,16 +426,16 @@
     function updateRateLimit(rateLimit) {
         if (!rateLimit || typeof rateLimit.remaining !== 'number') return;
         const el = document.getElementById('statRateLimit');
-        let text = `${rateLimit.remaining.toLocaleString('pl-PL')} / ${rateLimit.limit.toLocaleString('pl-PL')}`;
+        let text = `${rateLimit.remaining.toLocaleString('en-US')} / ${rateLimit.limit.toLocaleString('en-US')}`;
         if (rateLimit.resetAt) {
-            const resetTime = new Date(rateLimit.resetAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+            const resetTime = new Date(rateLimit.resetAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             text += ` (reset ${resetTime})`;
         }
         el.textContent = text;
         el.style.color = rateLimit.remaining <= 50 ? 'var(--err)' : rateLimit.remaining <= 500 ? '#c98a1d' : '';
     }
 
-    // ============ PRZEGLĄDARKA ZAPISANYCH WYDAŃ ============
+    // ============ SAVED RELEASES BROWSER ============
     function normalizeSearch(s) {
         return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
@@ -401,20 +451,20 @@
             return `<div class="search-empty">${emptyText}</div>`;
         }
         return shown.map(item => `
-            <div class="search-item">
+            <a class="search-item" href="${escapeHtml(`https://toolost.com/release-preview/${toBase64(item.id.toString())}`)}" target="_blank" rel="noopener">
                 <div class="search-item-main">
                     <div class="search-item-title">${escapeHtml(item.title)}</div>
                     <div class="search-item-artist">${escapeHtml(item.artist)} · ID ${item.id}</div>
                 </div>
-                <a href="${escapeHtml(`https://toolost.com/release-preview/${toBase64(item.id.toString())}`)}" target="_blank" rel="noopener">Otwórz ↗</a>
-            </div>
+                <span class="search-item-arrow">→</span>
+            </a>
         `).join('') + (items.length > shown.length
-            ? `<div class="search-count">Pokazano ${shown.length} z ${items.length} wyników.</div>`
-            : `<div class="search-count">${footerText || `${items.length} wynik(ów).`}</div>`);
+            ? `<div class="search-count">Showing ${shown.length} of ${items.length} results.</div>`
+            : `<div class="search-count">${footerText || `${items.length} result(s).`}</div>`);
     }
 
-    // Lista artystów widocznych w zakładce „Artyści”.
-    // Celowo ograniczona wyłącznie do tych pięciu nazw.
+    // List of artists shown in the "Artists" tab.
+    // Intentionally limited to just these five names.
     const IMPORTANT_ARTISTS = [
         'Ayesha Erotica',
         'BJ Lips',
@@ -423,34 +473,45 @@
         'MISS LUXURY'
     ];
 
+    // Splits the "artist" field into individual names, so releases with multiple
+    // artists (e.g. "BJ Lips, Olive Ugly" or "BJ Lips x Olive Ugly") can be matched
+    // against EACH artist separately, not just the whole combined string.
+    function splitArtists(raw) {
+        return (raw || '')
+            .split(/,|\/|&|\+| x | X |\bfeat\.?\b|\bft\.?\b|\band\b|\bwith\b/)
+            .map(s => s.trim())
+            .filter(Boolean);
+    }
+
+    // The artist list is built EXCLUSIVELY from IMPORTANT_ARTISTS (see above) —
+    // for every saved release, we check whether ANY of the split artist names
+    // matches (after normalization) one of the artists on the list. This way
+    // releases credited to multiple artists are counted too, while no one
+    // outside IMPORTANT_ARTISTS ever shows up on the list.
     function getArtistsList() {
-        const map=new Map();
-        for(const item of itemsMap.values()){const k=normalizeSearch(item.artist); if(!map.has(k)) map.set(k,{display:item.artist,count:0,minId:item.id,maxId:item.id}); const a=map.get(k); a.count++; a.minId=Math.min(a.minId,item.id); a.maxId=Math.max(a.maxId,item.id);}
-        const list=IMPORTANT_ARTISTS.map(display=>{const a=map.get(normalizeSearch(display));return {display,count:a?.count||0,minId:a?.minId??null,maxId:a?.maxId??null};});
-        list.sort((a,b)=>a.display.localeCompare(b.display,'pl'));
+        const stats = new Map(IMPORTANT_ARTISTS.map(display => [normalizeSearch(display), { display, count: 0, minId: null, maxId: null }]));
+        for (const item of itemsMap.values()) {
+            const parts = splitArtists(item.artist);
+            const matchedKeys = new Set(parts.map(normalizeSearch).filter(k => stats.has(k)));
+            for (const k of matchedKeys) {
+                const s = stats.get(k);
+                s.count++;
+                if (s.minId === null || item.id < s.minId) s.minId = item.id;
+                if (s.maxId === null || item.id > s.maxId) s.maxId = item.id;
+            }
+        }
+        const list = Array.from(stats.values());
+        list.sort((a, b) => a.display.localeCompare(b.display, 'en'));
         return list;
     }
 
     function renderArtistsList() {
         const artists=getArtistsList();
-        searchResultsEl.innerHTML=artists.map(a=>`<div class="artist-card" data-artist="${escapeHtml(a.display)}"><div class="artist-card-top"><span class="artist-card-name">${escapeHtml(a.display)}</span><b>${a.count}</b></div><div class="artist-card-meta">${a.count?`ID ${a.minId.toLocaleString('pl-PL')} → ${a.maxId.toLocaleString('pl-PL')}`:'Brak zapisanych wydań'}</div></div>`).join('')+'<div class="search-count">Lista artystów.</div>';
-    }
-
-    function renderArtistDetail(artistName) {
-        const key = normalizeSearch(artistName);
-        const matches = Array.from(itemsMap.values()).filter(item => normalizeSearch(item.artist) === key);
-        matches.sort((a, b) => b.id - a.id);
-        const header = `
-            <div class="artist-detail-header">
-                <div class="artist-detail-title">${escapeHtml(artistName)}</div>
-                <button type="button" class="artist-back">← Wszyscy artyści</button>
-            </div>`;
-        searchResultsEl.innerHTML = header + renderItemsList(matches, 'Brak wydań tego artysty.', `${matches.length} wydań artysty „${artistName}”.`);
+        searchResultsEl.innerHTML=artists.map(a=>`<div class="artist-card" data-artist="${escapeHtml(a.display)}"><div class="artist-card-top"><span class="artist-card-name">${escapeHtml(a.display)}</span><b>${a.count}</b></div><div class="artist-card-meta">${a.count?`ID ${a.minId.toLocaleString('en-US')} → ${a.maxId.toLocaleString('en-US')}`:'No saved releases'}</div></div>`).join('')+'<div class="search-count">Artist list.</div>';
     }
 
     function renderSearchResults() {
         if (browseMode === 'artists') { renderArtistsList(); return; }
-        if (browseMode === 'artist-detail') { renderArtistDetail(selectedArtist); return; }
 
         const raw = searchInput.value.trim();
         if (raw === '') {
@@ -470,14 +531,13 @@
             if (terms.every(t => hay.includes(t))) matches.push(item);
         }
         matches.sort((a, b) => b.id - a.id);
-        searchResultsEl.innerHTML = renderItemsList(matches, 'Brak wyników.', `${matches.length} wynik(ów).`);
+        searchResultsEl.innerHTML = renderItemsList(matches, 'No results.', `${matches.length} result(s).`);
     }
 
-    function setBrowseMode(mode, artist) {
+    function setBrowseMode(mode) {
         browseMode = mode;
-        selectedArtist = artist || null;
         toggleArtistsBtn.classList.toggle('active', browseMode !== 'search');
-        toggleArtistsBtn.textContent = browseMode === 'search' ? 'Artyści' : 'Wydania';
+        toggleArtistsBtn.textContent = browseMode === 'search' ? 'Artists' : 'Releases';
         renderSearchResults();
     }
 
@@ -500,9 +560,10 @@
 
     searchResultsEl.addEventListener('click', (e) => {
         const card = e.target.closest('.artist-card');
-        if (card) { setBrowseMode('artist-detail', card.dataset.artist); return; }
-        const back = e.target.closest('.artist-back');
-        if (back) { setBrowseMode('artists'); }
+        if (!card) return;
+        searchInput.value = card.dataset.artist;
+        setBrowseMode('search');
+        searchInput.focus();
     });
 
     let session={checked:0,found:0,miss:0,errors:0,lastId:null};
@@ -514,19 +575,19 @@
         const gapFillBtn = document.getElementById('gapFillBtn');
         gapFillBtn.classList.toggle('running', isRunning && runningDirection === 'gapfill');
         gapFillBtn.textContent = isRunning && runningDirection === 'gapfill'
-            ? '⏹ Zatrzymaj (uzupełnianie luk)'
-            : '⬇ Skanuj w dół od ID (pomiń zapisane, uzupełnij luki)';
+            ? 'Stop (gap fill)'
+            : 'Scan Down From ID (skip saved, fill gaps)';
         gapFillBtn.disabled = isRunning && runningDirection !== 'gapfill';
     }
 
-    // ============ WCZYTYWANIE Z GIST (z automatycznym ponawianiem aż do skutku) ============
+    // ============ LOADING FROM GIST (with automatic retry until it succeeds) ============
     const CHUNK_RETRY_BASE_DELAY_MS = 1000;
     const CHUNK_RETRY_MAX_DELAY_MS = 15000;
 
     function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
     function retryDelay(attempt) { return Math.min(CHUNK_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1), CHUNK_RETRY_MAX_DELAY_MS); }
 
-    // Pobiera metadane Gista, ponawiając próby (z rosnącym odstępem) aż się uda.
+    // Fetches the Gist metadata, retrying (with growing delay) until it succeeds.
     async function fetchGistMetaWithRetry() {
         let attempt = 0;
         while (true) {
@@ -537,13 +598,13 @@
                 return await resp.json();
             } catch (err) {
                 const delay = retryDelay(attempt);
-                log(`Nie udało się wczytać Gista (próba ${attempt}): ${err.message}. Ponawiam za ${Math.round(delay / 1000)}s...`, 'error');
+                log(`Failed to load the Gist (attempt ${attempt}): ${err.message}. Retrying in ${Math.round(delay / 1000)}s...`, 'error');
                 await sleep(delay);
             }
         }
     }
 
-    // Pobiera i parsuje jeden plik chunk_*.json, ponawiając próby aż się uda.
+    // Fetches and parses a single chunk_*.json file, retrying until it succeeds.
     async function loadChunkWithRetry(name, file) {
         let attempt = 0;
         while (true) {
@@ -556,13 +617,13 @@
                     content = await rawResp.text();
                 }
                 const parsed = JSON.parse(content);
-                if (!Array.isArray(parsed)) throw new Error('oczekiwano tablicy JSON');
+                if (!Array.isArray(parsed)) throw new Error('expected a JSON array');
                 parsed.forEach(item => addItemToMemory(item));
-                if (attempt > 1) log(`Odczytano ${name} po ${attempt} próbach.`, 'info');
+                if (attempt > 1) log(`Read ${name} after ${attempt} attempts.`, 'info');
                 return;
             } catch (err) {
                 const delay = retryDelay(attempt);
-                log(`Nie udało się odczytać pliku ${name} z Gista (próba ${attempt}): ${err.message}. Ponawiam za ${Math.round(delay / 1000)}s...`, 'error');
+                log(`Failed to read file ${name} from Gist (attempt ${attempt}): ${err.message}. Retrying in ${Math.round(delay / 1000)}s...`, 'error');
                 await sleep(delay);
             }
         }
@@ -579,15 +640,15 @@
             lastChunkName = chunkNames.length ? chunkNames[chunkNames.length - 1] : null;
             updateStatusBar();
             renderSearchResults();
-            log(`Wczytano ${itemsMap.size.toLocaleString('pl-PL')} wydań z Gist (zakres ID ${minId}–${maxId}).`, 'info');
+            log(`Loaded ${itemsMap.size.toLocaleString('en-US')} releases from Gist (ID range ${minId}–${maxId}).`, 'info');
     }
 
-    // ============ UPLOAD DO GIST (ręczny) ============
-    // ============ WYSYŁANIE NA HOSTING (w paczkach — jeden request nie może być za duży) ============
+    // ============ UPLOAD TO GIST (manual) ============
+    // ============ SENDING TO HOSTING (in batches — a single request can't be too large) ============
     function makeUploadBatches(items, maxBytes) {
         const batches = [];
         let current = [];
-        let currentSize = 2; // nawiasy tablicy
+        let currentSize = 2; // array brackets
         for (const item of items) {
             const itemSize = JSON.stringify(item).length + 1;
             if (current.length > 0 && currentSize + itemSize > maxBytes) {
@@ -605,7 +666,7 @@
     async function uploadToGist() {
         if (isUploading) return;
         if (pendingNewItems.length === 0) {
-            setSaveStatus('Brak nowych pozycji do wysłania.');
+            setSaveStatus('No new items to upload.');
             return;
         }
         isUploading = true;
@@ -615,12 +676,12 @@
         updateStatusBar();
 
         const batches = makeUploadBatches(toSend, UPLOAD_BATCH_BYTES);
-        log(`Wysyłanie ${toSend.length} pozycji na hosting w ${batches.length} paczkach (limit ~${Math.round(UPLOAD_BATCH_BYTES / 1024)}KB/paczkę)...`, 'info');
+        log(`Uploading ${toSend.length} items in ${batches.length} batches (limit ~${Math.round(UPLOAD_BATCH_BYTES / 1024)}KB/batch)...`, 'info');
 
         let totalSent = 0;
         for (let i = 0; i < batches.length; i++) {
             const batch = batches[i];
-            setSaveStatus(`Wysyłanie paczki ${i + 1}/${batches.length} (${batch.length} pozycji)...`);
+            setSaveStatus(`Uploading batch ${i + 1}/${batches.length} (${batch.length} items)...`);
             try {
                 const resp = await fetch('/api/save-gist', {
                     method: 'POST',
@@ -633,28 +694,28 @@
                     const remaining = batch.concat(...batches.slice(i + 1));
                     pendingNewItems = remaining.concat(pendingNewItems);
                     updateStatusBar();
-                    setSaveStatus(`Błąd zapisu przy paczce ${i + 1}/${batches.length}: ${result.error || resp.status}. Reszta wróciła do kolejki — spróbuj ponownie.`);
-                    log(`Nie udało się wysłać paczki ${i + 1}/${batches.length}: ${result.error || resp.status}`, 'error');
+                    setSaveStatus(`Upload error on batch ${i + 1}/${batches.length}: ${result.error || resp.status}. The rest was returned to the queue — try again.`);
+                    log(`Failed to upload batch ${i + 1}/${batches.length}: ${result.error || resp.status}`, 'error');
                     break;
                 }
                 if (result.lastChunkName) lastChunkName = result.lastChunkName;
                 totalSent += batch.length;
-                log(`Wysłano paczkę ${i + 1}/${batches.length} (${batch.length} pozycji).`, 'info');
+                log(`Uploaded batch ${i + 1}/${batches.length} (${batch.length} items).`, 'info');
             } catch (err) {
                 const remaining = batch.concat(...batches.slice(i + 1));
                 pendingNewItems = remaining.concat(pendingNewItems);
                 updateStatusBar();
-                setSaveStatus(`Błąd sieci przy paczce ${i + 1}/${batches.length}: ${err.message}. Reszta wróciła do kolejki — spróbuj ponownie.`);
-                log(`Błąd sieci przy wysyłaniu paczki ${i + 1}/${batches.length}: ${err.message}`, 'error');
+                setSaveStatus(`Network error on batch ${i + 1}/${batches.length}: ${err.message}. The rest was returned to the queue — try again.`);
+                log(`Network error while uploading batch ${i + 1}/${batches.length}: ${err.message}`, 'error');
                 break;
             }
         }
 
         if (totalSent === toSend.length) {
-            const now = new Date().toLocaleTimeString('pl-PL');
+            const now = new Date().toLocaleTimeString('en-US');
             document.getElementById('statUpload').textContent = now;
-            setSaveStatus(`Zapisano ${totalSent} pozycji na hostingu (${now}).`);
-            log(`Wysłano łącznie ${totalSent} nowych wydań na hosting (${batches.length} paczek).`, 'info');
+            setSaveStatus(`Saved ${totalSent} items to hosting (${now}).`);
+            log(`Uploaded a total of ${totalSent} new releases to hosting (${batches.length} batches).`, 'info');
         }
 
         isUploading = false;
@@ -662,7 +723,7 @@
     }
     document.getElementById('uploadBtn').addEventListener('click', uploadToGist);
 
-    // ============ EKSPORT LOKALNY (kopia zapasowa) ============
+    // ============ LOCAL EXPORT (backup) ============
     document.getElementById('exportBtn').addEventListener('click', () => {
         const allItems = Array.from(itemsMap.values()).sort((a, b) => a.id - b.id);
         const blob = new Blob([JSON.stringify(allItems)], { type: 'application/json' });
@@ -674,20 +735,20 @@
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        log(`Wyeksportowano lokalną kopię zapasową (${allItems.length} pozycji).`, 'info');
+        log(`Exported a local backup (${allItems.length} items).`, 'info');
     });
 
-    // ============ IMPORT LOKALNY (z pliku JSON) ============
-    // Akceptuje zarówno plik z eksportu (tablica pozycji), jak i pojedynczy "chunk_*.json" z Gista.
-    // Nowe pozycje trafiają do itemsMap (widoczne od razu w wyszukiwarce) i do pendingNewItems,
-    // żeby dało się je normalnie wysłać przyciskiem "Wyślij nowe dane na hosting".
+    // ============ LOCAL IMPORT (from a JSON file) ============
+    // Accepts both an export file (an array of items) and a single "chunk_*.json" from the Gist.
+    // New items are added to itemsMap (visible right away in the search) and to pendingNewItems,
+    // so they can be uploaded normally with the "Upload New Data" button.
     document.getElementById('importBtn').addEventListener('click', () => {
         document.getElementById('importFileInput').click();
     });
 
     document.getElementById('importFileInput').addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        e.target.value = ''; // pozwala wybrać ten sam plik ponownie później
+        e.target.value = ''; // allows selecting the same file again later
         if (!file) return;
 
         let parsed;
@@ -695,13 +756,13 @@
             const text = await file.text();
             parsed = JSON.parse(text);
         } catch (err) {
-            log(`Nie udało się odczytać pliku "${file.name}": ${err.message}`, 'error');
+            log(`Failed to read file "${file.name}": ${err.message}`, 'error');
             return;
         }
 
         const items = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.items) ? parsed.items : null);
         if (!items) {
-            log(`Plik "${file.name}" nie zawiera tablicy wydań (oczekiwano [...] lub { items: [...] }).`, 'error');
+            log(`File "${file.name}" doesn't contain an array of releases (expected [...] or { items: [...] }).`, 'error');
             return;
         }
 
@@ -714,8 +775,8 @@
 
             const item = {
                 id,
-                title: raw.title || 'Nieznany tytuł',
-                artist: raw.artist || 'Nieznany artysta'
+                title: raw.title || 'Unknown Title',
+                artist: raw.artist || 'Unknown Artist'
             };
 
             const isNew = addItemToMemory(item);
@@ -729,13 +790,13 @@
 
         updateStatusBar();
         renderSearchResults();
-        log(`Import "${file.name}": dodano ${added} nowych, ${duplicates} już było zapisanych${invalid ? `, ${invalid} pominięto (brak/zły id)` : ''}.`, 'info');
+        log(`Import "${file.name}": added ${added} new, ${duplicates} already saved${invalid ? `, ${invalid} skipped (missing/invalid id)` : ''}.`, 'info');
         if (added > 0) {
-            setSaveStatus(`Zaimportowano ${added} nowych pozycji — kliknij "Wyślij nowe dane na hosting", żeby je zapisać na stałe.`);
+            setSaveStatus(`Imported ${added} new items — click "Upload New Data" to save them permanently.`);
         }
     });
 
-    // ============ POBIERANIE JEDNEGO ID (z retry i timeoutem) ============
+    // ============ FETCHING A SINGLE ID (with retry and timeout) ============
     async function fetchOne(id, attempt) {
         attempt = attempt || 1;
         const encodedId = toBase64(id.toString());
@@ -760,22 +821,22 @@
 
             const artistEl = doc.querySelector('.rp-artists');
             const title = titleEl.textContent.trim();
-            const artist = artistEl ? artistEl.textContent.trim() : 'Nieznany artysta';
+            const artist = artistEl ? artistEl.textContent.trim() : 'Unknown Artist';
             return { id, status: 'found', title, artist };
         } catch (err) {
             clearTimeout(timeoutHandle);
             if (attempt < 2) return fetchOne(id, attempt + 1);
-            return { id, status: 'error', message: err.name === 'AbortError' ? 'przekroczono czas oczekiwania' : err.message };
+            return { id, status: 'error', message: err.name === 'AbortError' ? 'request timed out' : err.message };
         }
     }
 
-    // ============ SKANOWANIE W DÓŁ OD PODANEGO ID — POMIJA JUŻ ZAPISANE, WYPEŁNIA LUKI ============
-    // Startuje od startId i schodzi w dół po kolei. Dla każdego ID: jeśli już jest w itemsMap
-    // (czyli mamy je zapisane), pomija bez wysyłania żądania sieciowego — tylko przesuwa się dalej.
-    // Jeśli ID nie jest zapisane, fetchuje je normalnie — dzięki temu wypełnia luki w już
-    // zeskanowanym zakresie. Po przejściu przez cały znany zakres (poniżej najniższego znanego ID)
-    // wszystko jest "nieznane", więc po prostu leci dalej jak zwykłe skanowanie w dół — nie
-    // zatrzymuje się tylko dlatego, że wyszło poza dotychczasowy zakres.
+    // ============ SCANNING DOWN FROM A GIVEN ID — SKIPS ALREADY SAVED, FILLS GAPS ============
+    // Starts at startId and works its way down one by one. For each ID: if it's already in
+    // itemsMap (i.e. we already have it saved), skip it without making a network request —
+    // just move on. If the ID isn't saved yet, fetch it normally — this fills gaps within the
+    // range already scanned. Once past the entire known range (below the lowest known ID),
+    // everything is "unknown", so it just keeps going like a regular downward scan — it
+    // doesn't stop just because it went past the previously known range.
     async function scanDownFillGaps(startId) {
         let nextIdToAssign = startId;
         let missStreak = 0;
@@ -787,7 +848,7 @@
         let checkedSinceTick = 0;
         let skippedTotal = 0;
 
-        log(`Start uzupełniania luk: od ID ${startId} w dół, pomijam już zapisane ID, ${CONCURRENCY} żądań jednocześnie.`, 'info');
+        log(`Starting gap fill: from ID ${startId} downward, skipping already-saved IDs, ${CONCURRENCY} concurrent requests.`, 'info');
 
         const speedEl = document.getElementById('statSpeed');
         speedIntervalHandle = setInterval(() => {
@@ -802,7 +863,7 @@
                 if (nextIdToAssign < 1) {
                     if (skipStart !== null) {
                         skippedTotal += (skipStart - skipEnd + 1);
-                        log(`… pominięto ${(skipStart - skipEnd + 1).toLocaleString('pl-PL')} już zapisanych ID (${skipStart} → ${skipEnd})`, 'info');
+                        log(`… skipped ${(skipStart - skipEnd + 1).toLocaleString('en-US')} already-saved IDs (${skipStart} → ${skipEnd})`, 'info');
                     }
                     return null;
                 }
@@ -815,7 +876,7 @@
                 }
                 if (skipStart !== null) {
                     skippedTotal += (skipStart - skipEnd + 1);
-                    log(`… pominięto ${(skipStart - skipEnd + 1).toLocaleString('pl-PL')} już zapisanych ID (${skipStart} → ${skipEnd})`, 'info');
+                    log(`… skipped ${(skipStart - skipEnd + 1).toLocaleString('en-US')} already-saved IDs (${skipStart} → ${skipEnd})`, 'info');
                 }
                 return id;
             }
@@ -828,7 +889,7 @@
                 if (id === null) {
                     if (!boundaryLogged) {
                         boundaryLogged = true;
-                        log('Zakończono: osiągnięto dolną granicę zakresu ID (1).', 'info');
+                        log('Finished: reached the lower boundary of the ID range (1).', 'info');
                     }
                     isRunning = false;
                     break;
@@ -850,25 +911,25 @@
                 } else if (res.status === 'notfound') {
                     session.miss++; missStreak++;
                     errorStreak = 0;
-                    log(`— ID ${res.id}: brak wydania (404)`, 'miss');
+                    log(`— ID ${res.id}: no release (404)`, 'miss');
                     if (missStreak - lastMilestoneAt >= MISS_MILESTONE) {
                         lastMilestoneAt = missStreak;
-                        log(`Uwaga: ${missStreak} kolejnych ID bez wydania z rzędu — może to być zwykła przerwa w numeracji, skanowanie kontynuowane.`, 'info');
+                        log(`Note: ${missStreak} consecutive IDs with no release — this may just be a gap in the numbering, scan continuing.`, 'info');
                     }
                     if (missStreak >= MISS_SAFETY_LIMIT) {
                         if (!safetyLogged) {
                             safetyLogged = true;
-                            log(`Przerwano (bezpiecznik): ${MISS_SAFETY_LIMIT} kolejnych ID bez wydania. To NIE musi oznaczać końca zakresu. Wznów ręcznie, jeśli chcesz kontynuować dalej w dół.`, 'error');
+                            log(`Stopped (safety limit): ${MISS_SAFETY_LIMIT} consecutive IDs with no release. This does NOT necessarily mean the end of the range. Resume manually if you want to keep scanning further down.`, 'error');
                         }
                         isRunning = false;
                     }
                 } else if (res.status === 'error') {
                     session.errors++; errorStreak++;
-                    log(`✖ ID ${res.id}: błąd — ${res.message}`, 'error');
+                    log(`✖ ID ${res.id}: error — ${res.message}`, 'error');
                     if (errorStreak >= ERROR_STREAK_LIMIT) {
                         if (!errorLogged) {
                             errorLogged = true;
-                            log(`Przerwano: ${ERROR_STREAK_LIMIT} kolejnych błędów sieci — sprawdź połączenie lub czy strona nie blokuje zapytań.`, 'error');
+                            log(`Stopped: ${ERROR_STREAK_LIMIT} consecutive network errors — check your connection or whether the site is blocking requests.`, 'error');
                         }
                         isRunning = false;
                     }
@@ -885,24 +946,24 @@
         speedEl.textContent = '–';
         runningDirection = null;
         setButtonsForRunningState();
-        log(`Uzupełnianie luk zatrzymane. Łącznie pominięto ${skippedTotal.toLocaleString('pl-PL')} już zapisanych ID.`, 'info');
+        log(`Gap fill stopped. Skipped a total of ${skippedTotal.toLocaleString('en-US')} already-saved IDs.`, 'info');
     }
     function handleGapFillClick() {
         if (isRunning && runningDirection === 'gapfill') {
-            isRunning = false; // toggle: drugie kliknięcie zatrzymuje
-            log('Zatrzymywanie uzupełniania luk (po zakończeniu bieżących żądań)...', 'info');
+            isRunning = false; // toggle: second click stops it
+            log('Stopping gap fill (once current requests finish)...', 'info');
             return;
         }
-        if (isRunning) return; // inny tryb już działa (przycisk i tak disabled)
+        if (isRunning) return; // another mode is already running (button is disabled anyway)
 
         const startRaw = document.getElementById('startIdInput').value.trim();
         if (startRaw === '') {
-            log('Podaj ID startowe, od którego ma zacząć się skanowanie w dół.', 'error');
+            log('Enter a start ID for the downward scan to begin from.', 'error');
             return;
         }
         const startId = parseInt(startRaw, 10);
         if (isNaN(startId) || startId < 1) {
-            log('Nieprawidłowe ID startowe.', 'error');
+            log('Invalid start ID.', 'error');
             return;
         }
 
@@ -914,7 +975,7 @@
 
     document.getElementById('gapFillBtn').addEventListener('click', handleGapFillClick);
 
-    // ============ START APLIKACJI ============
+    // ============ APP START ============
     async function init() {
         setButtonsForRunningState();
         updateStatusBar();
